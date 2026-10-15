@@ -1,6 +1,7 @@
 import { cloneSettings, type Settings } from '../engine/catalog';
 import { noise } from '../engine/color';
 import type { Pixels } from '../engine/process';
+import { validateMotionEffects, type MotionEffect, type MotionFrame } from './catalog';
 
 export const channels = {
   brightness: [-100, 100],
@@ -27,6 +28,7 @@ export interface Timeline {
   cycles: number;
   easing: 'linear' | 'smooth' | 'hold';
   keys: Keyframe[];
+  effects: MotionEffect[];
 }
 export const timelineDefaults = (duration = 4): Timeline => ({
   start: 0,
@@ -38,6 +40,7 @@ export const timelineDefaults = (duration = 4): Timeline => ({
   cycles: 1,
   easing: 'smooth',
   keys: [],
+  effects: [],
 });
 export function validateTimeline(value: unknown, duration: number): Timeline {
   if (!value || typeof value !== 'object') throw new Error('Invalid animation settings.');
@@ -69,7 +72,10 @@ export function validateTimeline(value: unknown, duration: number): Timeline {
     )
       throw new Error('Invalid keyframe.');
   }
-  return structuredClone(t);
+  return {
+    ...structuredClone(t),
+    effects: validateMotionEffects(t.effects === undefined ? [] : t.effects),
+  };
 }
 export function settingsAt(base: Settings, t: Timeline, time: number): Settings {
   const s = cloneSettings(base);
@@ -127,5 +133,20 @@ export function outputDimensions(w: number, h: number, max: number) {
   return {
     width: Math.max(2, Math.floor((w * r) / 2) * 2),
     height: Math.max(2, Math.floor((h * r) / 2) * 2),
+  };
+}
+
+/** Snap playback and scrubbing to the same source timestamps used by export. */
+export function sampleTime(t: Timeline, time: number): number {
+  const frame = Math.min(
+    frameCount(t) - 1,
+    Math.max(0, Math.floor((time - t.start) * t.fps + 1e-7)),
+  );
+  return t.start + frame / t.fps;
+}
+export function motionAt(t: Timeline, time: number): MotionFrame {
+  return {
+    progress: Math.max(0, Math.min(1, (time - t.start) / (t.end - t.start))),
+    effects: t.effects,
   };
 }

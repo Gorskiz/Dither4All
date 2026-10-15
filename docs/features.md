@@ -16,7 +16,7 @@ Feature scope for Dither4All's independent image editor. No application binary, 
 | Batch processing                                | Original-size PNGs in a ZIP, sequential processing and cancellation                                      |
 | Vector export                                   | Color or black-only pixel paths; not contour tracing or embroidery output                                |
 | Projects                                        | Image/poster + settings + timeline in `.d4a`; video originals are relinked                               |
-| Video / animation / temporal effects            | Video decode, timeline/trim, numeric keyframes, five motion modes, MP4/WebM/audio, GIF and PNG sequences |
+| Video / animation / temporal effects            | Video decode, timeline/trim, numeric keyframes, source motion plus five stackable temporal effects, MP4/WebM/audio, GIF and PNG sequences |
 | Bespoke commercial algorithms and named effects | Not reproduced; internal behavior is unknown                                                             |
 
 This is feature-category coverage, not a claim of identical algorithms, equal counts, or pixel-perfect parity. Three serpentine entries are explicitly labeled variants, not newly invented algorithms. Compression blocks approximate a visual artifact; they do not corrupt actual JPEG bitstreams. CMYK is an RGB display simulation, not a color-managed print separation workflow.

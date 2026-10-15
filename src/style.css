@@ -1302,3 +1302,60 @@ dialog > a {
   background: var(--canvas);
   padding: 3px;
 }
+
+.motion-add {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0;
+}
+.motion-add select {
+  min-width: 0;
+  flex: 1;
+}
+.motion-add button {
+  flex-shrink: 0;
+}
+.motion-stack {
+  display: grid;
+  gap: 10px;
+}
+.motion-effect-card {
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.motion-effect-card legend {
+  padding: 0 5px;
+  font-size: 12px;
+  font-weight: 650;
+}
+.motion-effect-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.motion-effect-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+.motion-effect-toolbar button {
+  min-width: 28px;
+  min-height: 28px;
+  border-color: var(--line);
+}
+.motion-effect-card .field-row {
+  margin-top: 7px;
+}
+.motion-empty {
+  padding: 10px 0;
+}
+#motion-stack-status:empty {
+  display: none;
+}

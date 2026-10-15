@@ -4,6 +4,7 @@ import { type Settings } from '../engine/catalog';
 import { FrameProcessor } from './processor';
 import {
   animateNoise,
+  motionAt,
   frameCount,
   gifDelay,
   outputDimensions,
@@ -228,6 +229,9 @@ export async function exportMotion(o: MotionExport): Promise<Blob> {
       const result = await processor.process(
         animateNoise(canvasPixels(original), t, time, s.seed),
         s,
+        'export',
+        o.signal,
+        motionAt(t, time),
       );
       check();
       canvas

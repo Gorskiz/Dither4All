@@ -1,17 +1,20 @@
 import { defineConfig } from '@playwright/test';
 
+const port = process.env.PLAYWRIGHT_PORT ?? '5173';
+const baseURL = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: './tests/browser',
   // Image/video workers are CPU-heavy; avoid saturating the interactive dev machine.
   workers: process.env.CI ? 1 : 2,
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL,
     viewport: { width: 1440, height: 1100 },
     channel: process.env.PLAYWRIGHT_CHANNEL,
   },
   webServer: {
-    command: 'npm run dev -- --port 5173',
-    url: 'http://127.0.0.1:5173',
-    reuseExistingServer: !process.env.CI,
+    command: `npm run dev -- --port ${port} --strictPort`,
+    url: baseURL,
+    reuseExistingServer: !process.env.CI && !process.env.PLAYWRIGHT_PORT,
   },
 });

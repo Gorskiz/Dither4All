@@ -5,6 +5,8 @@ import { FrameProcessor } from './processor';
 import { VideoAsset, drawMotion, exportMotion } from './media';
 import {
   animateNoise,
+  motionAt,
+  sampleTime,
   channels,
   outputDimensions,
   settingsAt,
@@ -13,6 +15,12 @@ import {
   type Channel,
   type Timeline,
 } from './model';
+import {
+  MAX_MOTION_EFFECTS,
+  motionEffects,
+  newMotionEffect,
+  type MotionEffectType,
+} from './catalog';
 import type { CanvasSink } from 'mediabunny';
 
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -63,7 +71,7 @@ export class MotionEditor {
       <section id="timeline" class="timeline" aria-label="Animation timeline" hidden>
         <div class="transport"><button id="previous-frame" aria-label="Previous frame">⏮</button><button id="motion-play" aria-label="Play animation">▶</button><button id="next-frame" aria-label="Next frame">⏭</button><output id="motion-time">00:00.00 / 00:04.00</output><label class="loop-label"><input id="motion-loop" type="checkbox" checked> Loop</label><button id="motion-close" class="small-link">Still image</button></div>
         <label class="sr-only" for="motion-scrub">Playhead</label><input id="motion-scrub" type="range" min="0" max="4" step="0.001" value="0">
-        <div id="timeline-markers" class="timeline-markers" aria-label="Keyframes"></div>
+        <div id="timeline-markers" class="timeline-markers" role="group" aria-label="Keyframes"></div>
       </section>`,
     );
     document.querySelector('.inspector-body')!.insertAdjacentHTML(
@@ -75,9 +83,20 @@ export class MotionEditor {
         <div class="field-row" id="duration-row"><label for="motion-duration">Duration (s)</label><input id="motion-duration" type="number" min="0.1" max="30" step="0.1" value="4"></div>
         <div class="motion-trim"><label>In (s)<input id="motion-in" type="number" min="0" step="0.01" value="0"></label><label>Out (s)<input id="motion-out" type="number" min="0.01" step="0.01" value="4"></label><label>FPS<select id="motion-fps" aria-label="FPS"><option>6</option><option selected>12</option><option>24</option><option>30</option></select></label></div>
         <p class="hint">Export a selection up to 30 seconds. Preview adapts to your device.</p>
-        <div class="field-row"><label for="motion-effect">Animation</label><select id="motion-effect"><option value="none">None · source movement</option><option value="boil">Noise boil</option><option value="pulse">Brightness pulse</option><option value="zoom">Looping zoom</option><option value="pan">Horizontal drift</option></select></div>
+        <div class="field-row"><label for="motion-effect">Source motion</label><select id="motion-effect"><option value="none">None · source movement</option><option value="boil">Noise boil</option><option value="pulse">Brightness pulse</option><option value="zoom">Looping zoom</option><option value="pan">Horizontal drift</option></select></div>
         <div class="field-row"><label for="motion-amount">Amount</label><input id="motion-amount" type="range" min="0" max="100" value="35"></div>
         <div class="field-row"><label for="motion-cycles">Cycles</label><input id="motion-cycles" type="number" min="1" max="8" value="1"></div>
+        <div class="section-title motion-subheading"><h3>Motion stack</h3><span id="motion-stack-count" class="count">0 / 8</span></div>
+        <p class="hint">Applied top to bottom after dithering. Combine up to eight effects.</p>
+        <div class="motion-add"><label class="sr-only" for="motion-add-type">New motion effect</label><select id="motion-add-type">${Object.entries(
+          motionEffects,
+        )
+          .map(([type, info]) => `<option value="${type}">${info.name}</option>`)
+          .join(
+            '',
+          )}</select><button id="motion-add" class="outline-button">Add effect</button></div>
+        <div id="motion-stack" class="motion-stack" role="group" aria-label="Motion effect stack"></div>
+        <p id="motion-stack-status" class="hint" role="status"></p>
         <div class="section-title motion-subheading"><h3>Keyframes</h3><span id="key-count" class="count">0 / 200</span></div>
         <div class="field-row"><label for="key-channel">Property</label><select id="key-channel">${Object.keys(
           channels,
@@ -154,6 +173,19 @@ export class MotionEditor {
       this.t = validateTimeline(next, this.duration);
       this.keys();
       this.refresh();
+    });
+    bind('motion-add', () => {
+      this.assertIdle();
+      this.pause();
+      const type = el<HTMLSelectElement>('motion-add-type').value as MotionEffectType;
+      this.t = validateTimeline(
+        { ...this.t, effects: [...this.t.effects, newMotionEffect(type)] },
+        this.duration,
+      );
+      this.stack();
+      this.refresh();
+      el('motion-stack-status').textContent = `${motionEffects[type].name} added.`;
+      el('motion-stack').lastElementChild?.querySelector<HTMLInputElement>('input')?.focus();
     });
     bind('motion-cancel', () => this.exportAbort?.abort());
     document.addEventListener('keydown', (e) => {
@@ -293,8 +325,115 @@ export class MotionEditor {
       ? `${this.video.width} × ${this.video.height}`
       : 'ANIMATION';
     this.updateTime();
+    this.stack();
     this.keys();
     this.keyValue();
+  }
+  private stack() {
+    const container = el('motion-stack');
+    container.replaceChildren();
+    el('motion-stack-count').textContent = `${this.t.effects.length} / ${MAX_MOTION_EFFECTS}`;
+    el<HTMLButtonElement>('motion-add').disabled = this.t.effects.length >= MAX_MOTION_EFFECTS;
+    if (!this.t.effects.length) {
+      const empty = document.createElement('p');
+      empty.className = 'hint motion-empty';
+      empty.textContent = 'Add an effect to bring your pixels to life.';
+      container.append(empty);
+    }
+    this.t.effects.forEach((effect, index) => {
+      const name = motionEffects[effect.type].name;
+      const card = document.createElement('fieldset');
+      card.className = 'motion-effect-card';
+      const legend = document.createElement('legend');
+      legend.textContent = `${index + 1}. ${name}`;
+      card.append(legend);
+      const toolbar = document.createElement('div');
+      toolbar.className = 'motion-effect-toolbar';
+      const toggleLabel = document.createElement('label');
+      const toggle = document.createElement('input');
+      toggle.type = 'checkbox';
+      toggle.checked = effect.enabled;
+      toggle.setAttribute('aria-label', `Enable ${name} ${index + 1}`);
+      toggleLabel.append(toggle, 'Enabled');
+      toggle.onchange = () => {
+        if (this.busy) return;
+        this.pause();
+        effect.enabled = toggle.checked;
+        this.refresh();
+      };
+      toolbar.append(toggleLabel);
+      const action = (label: string, text: string, fn: () => void, disabled = false) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = text;
+        button.setAttribute('aria-label', `${label} ${name} ${index + 1}`);
+        button.disabled = disabled;
+        button.onclick = () => {
+          if (this.busy) return;
+          this.pause();
+          fn();
+          this.stack();
+          this.refresh();
+          el('motion-stack-status').textContent = `${name}: ${label.toLowerCase()}.`;
+          // Rebuilding a reordered stack must not strand keyboard focus on the document.
+          container
+            .querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
+            [Math.min(index, this.t.effects.length - 1)]?.focus();
+          if (!this.t.effects.length) el('motion-add').focus();
+        };
+        toolbar.append(button);
+      };
+      const move = (offset: number) => {
+        const effects = this.t.effects;
+        [effects[index], effects[index + offset]] = [effects[index + offset], effects[index]];
+      };
+      action('Move up', '↑', () => move(-1), index === 0);
+      action('Move down', '↓', () => move(1), index === this.t.effects.length - 1);
+      action('Remove', '×', () => this.t.effects.splice(index, 1));
+      card.append(toolbar);
+      const hint = document.createElement('p');
+      hint.className = 'hint';
+      hint.textContent = motionEffects[effect.type].hint;
+      card.append(hint);
+      for (const [property, label, min, max] of [
+        ['amount', 'Amount', 0, 100],
+        ['cycles', 'Cycles', 1, 8],
+        ['phase', 'Phase (°)', 0, 360],
+      ] as const) {
+        const row = document.createElement('div');
+        row.className = 'field-row';
+        const caption = document.createElement('label');
+        const input = document.createElement('input');
+        input.id = `motion-stack-${index}-${property}`;
+        caption.htmlFor = input.id;
+        caption.textContent = label;
+        input.type = 'number';
+        input.min = String(min);
+        input.max = String(max);
+        input.step = '1';
+        input.value = String(effect[property]);
+        input.setAttribute('aria-label', `${name} ${index + 1} ${label}`);
+        input.onchange = () => {
+          if (this.busy) return;
+          try {
+            const next = { ...effect, [property]: input.valueAsNumber };
+            validateTimeline(
+              { ...this.t, effects: this.t.effects.map((e, i) => (i === index ? next : e)) },
+              this.duration,
+            );
+            this.pause();
+            effect[property] = next[property];
+            this.refresh();
+          } catch (error) {
+            input.value = String(effect[property]);
+            this.host.error(error);
+          }
+        };
+        row.append(caption, input);
+        card.append(row);
+      }
+      container.append(card);
+    });
   }
   private readControls() {
     this.assertIdle();
@@ -440,16 +579,25 @@ export class MotionEditor {
     try {
       while (this.active && !this.previewStopped) {
         const version = this.revision,
-          time = this.time,
+          time = sampleTime(this.t, this.time),
           video = this.video;
         requested = version;
+        const selectedSide =
+          el<HTMLSelectElement>('motion-format').value === 'gif'
+            ? Math.min(640, number('motion-size'))
+            : number('motion-size');
         const base = this.host.source(),
           dims = outputDimensions(
             video?.width ?? base.width,
             video?.height ?? base.height,
-            methodLimits(this.host.settings().algorithm)?.previewSide ?? 640,
+            Math.min(
+              methodLimits(this.host.settings().algorithm)?.previewSide ?? 640,
+              selectedSide,
+            ),
           );
-        el('cancel-preview').hidden = !methodLimits(this.host.settings().algorithm);
+        el('cancel-preview').hidden =
+          !methodLimits(this.host.settings().algorithm) &&
+          !this.t.effects.some((e) => e.enabled && e.amount > 0);
         const frame = this.sink
           ? await this.sink.getCanvas(video!.first + Math.min(time, video!.duration - 0.00001))
           : null;
@@ -460,9 +608,7 @@ export class MotionEditor {
         const exportDims = outputDimensions(
           video?.width ?? base.width,
           video?.height ?? base.height,
-          el<HTMLSelectElement>('motion-format').value === 'gif'
-            ? Math.min(640, number('motion-size'))
-            : number('motion-size'),
+          selectedSide,
         );
         s.scale = Math.max(1, Math.round((s.scale * dims.width) / exportDims.width));
         this.processor ??= new FrameProcessor();
@@ -470,6 +616,8 @@ export class MotionEditor {
           animateNoise(canvasPixels(raw), this.t, time, s.seed),
           s,
           'preview',
+          undefined,
+          motionAt(this.t, time),
         );
         if (version !== this.revision && !this.playing) continue;
         const original = el<HTMLCanvasElement>('original-canvas'),
@@ -551,6 +699,7 @@ export class MotionEditor {
   async currentFrame(signal?: AbortSignal) {
     this.pause();
     if (this.pendingVideo) throw new Error('Relink the video first.');
+    const time = sampleTime(this.t, this.time);
     const base = this.host.source(),
       dims = outputDimensions(
         this.video?.width ?? base.width,
@@ -559,24 +708,23 @@ export class MotionEditor {
       );
     const frame = this.sink
       ? await this.sink.getCanvas(
-          this.video!.first + Math.min(this.time, this.video!.duration - 0.00001),
+          this.video!.first + Math.min(time, this.video!.duration - 0.00001),
         )
       : null;
-    const s = settingsAt(this.host.settings(), this.t, this.time),
+    const s = settingsAt(this.host.settings(), this.t, time),
       processor = new FrameProcessor();
     try {
       return await processor.process(
         animateNoise(
-          canvasPixels(
-            drawMotion(frame?.canvas ?? base, dims.width, dims.height, this.t, this.time),
-          ),
+          canvasPixels(drawMotion(frame?.canvas ?? base, dims.width, dims.height, this.t, time)),
           this.t,
-          this.time,
+          time,
           s.seed,
         ),
         s,
         'export',
         signal,
+        motionAt(this.t, time),
       );
     } finally {
       processor.dispose();
@@ -633,6 +781,7 @@ export class MotionEditor {
       this.busy = false;
       this.exportAbort = null;
       controls.forEach((c) => (c.disabled = false));
+      this.stack();
       el('motion-cancel').hidden = true;
       el('motion-progress').hidden = true;
       el<HTMLButtonElement>('export').disabled = false;

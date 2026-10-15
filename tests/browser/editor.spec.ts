@@ -4,13 +4,14 @@ import AxeBuilder from '@axe-core/playwright';
 
 test('image editor processes locally, compares, edits, undoes, and exports real files', async ({
   page,
+  baseURL,
 }) => {
   const errors: string[] = [],
     externalRequests: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('request', (r) => {
     if (
-      !r.url().startsWith('http://127.0.0.1:5173') &&
+      !r.url().startsWith(`${new URL(baseURL!).origin}/`) &&
       !r.url().startsWith('data:') &&
       !r.url().startsWith('blob:')
     )

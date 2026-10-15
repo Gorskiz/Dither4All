@@ -1,4 +1,5 @@
 import type { Settings } from '../engine/catalog';
+import type { MotionFrame } from './catalog';
 import type { Pixels } from '../engine/process';
 import { assertProcessingSize, workerTimeout, type Intent } from '../engine/limits';
 /** Persistent worker with a hard main-thread watchdog. Termination cancels synchronous work. */
@@ -10,6 +11,7 @@ export class FrameProcessor {
     settings: Settings,
     intent: Intent = 'export',
     signal?: AbortSignal,
+    motion?: MotionFrame,
   ): Promise<Pixels> {
     if (this.reject) throw new Error('Frame processor is busy.');
     signal?.throwIfAborted();
@@ -49,7 +51,7 @@ export class FrameProcessor {
         finish(data.error ? new Error(data.error) : undefined, data.result);
       worker.onerror = (event) => stop(new Error(event.message || 'Frame processing failed.'));
       try {
-        worker.postMessage({ pixels, settings, intent }, [pixels.data.buffer]);
+        worker.postMessage({ pixels, settings, intent, motion }, [pixels.data.buffer]);
       } catch (e) {
         stop(e instanceof Error ? e : new Error('Could not start worker.'));
       }

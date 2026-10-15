@@ -31,3 +31,9 @@ No Ditherista GUI, Qt code, icons, example artwork, native kdtree C implementati
 Additional modified adaptations include DBS (Robert Kist / Sankar Srinivasan),
 Lippens-Philips tables and rank diffusion, exact L-system rules, grid/auto-threshold,
 and a TypeScript KD-tree palette implementation with finite initialization.
+
+simplex-noise 4.0.3, Copyright (c) 2018 Jonas Wagner.
+License: MIT, ./licenses/simplex-noise-MIT.txt
+Source: https://github.com/jwagner/simplex-noise.js/tree/4.0.3
+https://www.npmjs.com/package/simplex-noise/v/4.0.3
+Loaded locally in the processing worker for looping 4D noise displacement.

@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "gifenc": "^1.0.3",
-    "mediabunny": "^1.61.5"
+    "mediabunny": "^1.61.5",
+    "simplex-noise": "^4.0.3"
   }
 }

@@ -29,6 +29,8 @@ test('still animation scrubs, keyframes, plays, cancels and exports GIF/PNG sequ
   await page.goto('/');
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await expect(page.locator('#timeline')).toBeVisible();
+  await page.getByLabel('New motion effect', { exact: true }).selectOption('flow');
+  await page.getByRole('button', { name: 'Add effect', exact: true }).click();
   await expect(page.locator('#render-status')).toContainText('Motion preview');
   await page.getByLabel('Duration (s)', { exact: true }).fill('1');
   await page.getByLabel('Duration (s)', { exact: true }).press('Tab');
@@ -95,6 +97,8 @@ test('video import, trim, keyframe project relink, and audio-preserving MP4/WebM
   const file = { name: 'moving-test.webm', mimeType: 'video/webm', buffer: Buffer.from(bytes) };
   await page.locator('#image-input').setInputFiles(file);
   await expect(page.locator('#motion-kind')).toHaveText('160 × 120');
+  await page.getByLabel('New motion effect', { exact: true }).selectOption('ripple');
+  await page.getByRole('button', { name: 'Add effect', exact: true }).click();
   await page.getByLabel('Style', { exact: true }).selectOption('blue-noise');
   await page.getByLabel('Space', { exact: true }).selectOption('linear');
   await page.getByLabel('Match', { exact: true }).selectOption('lab');
@@ -130,6 +134,7 @@ test('video import, trim, keyframe project relink, and audio-preserving MP4/WebM
   await page.getByRole('button', { name: 'Save project', exact: true }).click();
   const project = await readFile((await (await save).path())!);
   expect(JSON.parse(project.toString()).motion.timeline.start).toBe(0.5);
+  expect(JSON.parse(project.toString()).motion.timeline.effects[0].type).toBe('ripple');
   await page
     .locator('#project-input')
     .setInputFiles({ name: 'motion.d4a', mimeType: 'application/json', buffer: project });
