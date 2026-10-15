@@ -1,9 +1,9 @@
 {
   "name": "dither4all",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Free online dither. An image studio that processes everything on your device.",
+  "description": "Free online dither. An image and motion studio that processes everything on your device.",
   "license": "MIT",
   "scripts": {
     "dev": "vite --host 127.0.0.1",

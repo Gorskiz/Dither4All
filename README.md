@@ -1,8 +1,8 @@
 # Dither4All
 
-**Free online dither.** An open-source image studio that runs entirely in your browser.
+**Free online dither.** An open-source image and motion studio that runs entirely in your browser.
 
-No account. No image uploads. No paid tier. MIT licensed.
+No account. No media uploads. No paid tier. MIT licensed.
 
 [Open the editor](https://gorskiz.github.io/Dither4All/) · [Report a bug](https://github.com/Gorskiz/Dither4All/issues)
 
@@ -26,9 +26,10 @@ Requires Node.js 22.12+; Node.js 24 is used in CI.
 - **Color:** 12 built-in palettes, editable 2–16-color palettes, median-cut extraction, RGB quantization, and JSON/hex/GIMP palette imports and exports.
 - **Image adjustments:** pixel scale, strength, threshold, pattern size, brightness, contrast, gamma, saturation, inversion, and a reproducible random seed.
 - **Workflow:** a continuous photo-editor inspector beside a persistent canvas, before/after comparison, zoom, undo/redo, drag and drop, clipboard paste/copy, five starting presets, saved browser presets, portable preset files, and settings links.
+- **Motion:** video import, silent playback, scrubbing, trim points, looping, adjustment keyframes, noise boil, brightness pulse, zoom and horizontal drift. Export MP4/WebM with optional source audio, animated GIF, or PNG frames in a ZIP. [Motion guide](docs/motion.md).
 - **Files:** PNG/JPEG/WebP, SVG pixel-run paths in color or black ink, embedded-image `.d4a` project files, and batch processing to a ZIP.
 
-All image decoding and processing happens on your device. No accounts, telemetry, remote fonts, image uploads, API keys, or backend. The host still receives ordinary requests to load the app. Local presets use browser storage. Shared settings links contain no image; project files do contain the source image.
+All image/video decoding and processing happens on your device. No accounts, telemetry, remote fonts, image uploads, API keys, or backend. The host still receives ordinary requests to load the app. Local presets use browser storage. Shared settings links contain no image; project files do contain the source image.
 
 ## Running and contributing
 
@@ -52,10 +53,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md), the [architecture](docs/architecture.md)
 - SVG: at most one megapixel. These are real filled pixel paths, not smooth contour tracing or embroidery machine instructions. Black SVG drops pixels with luminance ≥128.
 - Batch: 20 files, 100 MB total input, 250 MB total encoded output. Files are processed sequentially; cancel stops the current worker. Batch always exports original-size PNGs using a snapshot of the current settings.
 - Effect layers run after dithering and may introduce colors outside the selected palette. Effects use the reduced pixel grid, then the result is expanded without changing the source dimensions.
-- Large images and long effect stacks can be slow or memory-intensive on phones. Video, timelines, and animated exports are outside this release.
+- Large images and long effect stacks can be slow or memory-intensive on phones. Motion exports: up to 30 seconds, 900 frames, longest side 1280 px (GIF: 640 px). Inputs: 500 MB, 2 hours, 16 MP/frame. WebCodecs support varies; try another output format if a codec is unavailable.
 
 ## License and independence
 
 Independent implementations of documented image-processing algorithms.
 
-App code and original procedural sample artwork: [MIT](LICENSE). Build/test dependencies retain their own licenses. Public product demonstrations informed the feature categories; they do not establish implementation or exact output parity.
+App code and original procedural sample artwork: [MIT](LICENSE). Runtime media libraries retain their own licenses: Mediabunny (MPL-2.0) and gifenc (MIT). See [third-party notices](public/third-party-notices.txt). Build/test dependencies retain their own licenses. Public product demonstrations informed the feature categories; they do not establish implementation or exact output parity.

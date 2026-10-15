@@ -2,7 +2,7 @@
 
 ## Runtime
 
-Vite builds TypeScript and CSS into a static application. There are no runtime npm dependencies, remote fonts, remote images, or external script tags. The bundled sample is original procedural artwork generated in `src/sample.ts`.
+Vite builds TypeScript and CSS into a static application. Mediabunny and gifenc are bundled locally and loaded only for media work. There are no remote fonts, remote images, or external script tags. The bundled sample is original procedural artwork generated in `src/sample.ts`.
 
 `src/main.ts` owns editor state, bounded settings history, file operations, dialogs, and browser-local saved presets. `src/engine/catalog.ts` defines typed settings, effect identifiers, defaults, diffusion kernels, palettes, and strict import validation.
 
@@ -31,6 +31,14 @@ Batch snapshots the settings at its start, decodes one image at a time, and coll
 - `.d4a`: versioned JSON with settings, a source name, and an embedded PNG image.
 - No network writes, account system, cookies, analytics, or service APIs.
 
-## Future work
+## Motion
 
-Keep the image kernel separate from UI and decoding. A later video pipeline can supply decoded frames to the kernel, but must separately handle codecs, audio, memory bounds, frame timing, cancellation, and muxing. Do not add video dependencies to the image editor until that work is justified.
+`src/motion/model.ts` validates timelines and evaluates numeric keyframes and temporal animation deterministically. Keyframes override image settings, with hold, linear, or smooth interpolation. Style undo/presets remain image-setting operations; animation keys are edited directly and saved in projects.
+
+`src/motion/editor.ts` owns playback, trim, and scrubbing. Preview uses a persistent worker through `processor.ts`, displays frames at up to 640 px and 12 fps, and skips outdated work. The wall clock drives playback so slow processing does not stretch the timeline. Preview is silent. Decoding uses a bounded CanvasSink, honoring display orientation and timestamps.
+
+`src/motion/media.ts` opens an independent source for export, iterates monotonically ordered timestamps, processes one frame at a time, and muxes MP4/AVC/AAC or WebM/VP8/Opus using browser codecs through Mediabunny. Audio samples are clipped to the selection and timestamps rebased. Encoded audio can contain codec packet padding. Capability checks run before frames are rendered. Cancellation terminates processors and disposes decoder/encoder resources.
+
+GIF quantization and encoding run in a separate worker (`gif-worker.ts`). GIF delays distribute centiseconds across frames to preserve total timing. PNG ZIPs include sequentially named frames and timing metadata. Export uses settings/timeline snapshots; source replacement is blocked while exporting. Limits bound retained output (120 MB for GIF/PNG sequences), duration, frame count and dimensions. Memory availability still varies by device; output is collected in memory before download.
+
+Projects retain v1 compatibility, with optional validated motion metadata. Stills embed the original image; video projects embed a poster and original filename/size reference. They require relinking the original video after reopening. No original video is embedded or uploaded.
