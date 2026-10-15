@@ -1,3 +1,5 @@
+import { assertProcessingSize, budgetFor, type Intent } from './limits';
+import { remainingDither } from './ditherista/remaining';
 import { paletteMatcher, srgbToLinear, linearToSrgb } from './perceptual';
 import {
   matrixScreen,
@@ -14,6 +16,7 @@ export interface Pixels {
   width: number;
   height: number;
   data: Uint8ClampedArray;
+  notice?: string;
 }
 function bayer(x: number, y: number, size: number): number {
   let value = 0;
@@ -104,7 +107,9 @@ function cmyk(r: number, g: number, b: number, x: number, y: number, size: numbe
   ];
 }
 /** Pure image kernel: DOM-free, deterministic, and shared by preview/export. */
-export function processImage(input: Pixels, s: Settings): Pixels {
+export function processImage(input: Pixels, s: Settings, intent: Intent = 'export'): Pixels {
+  assertProcessingSize(input.width, input.height, s, intent);
+  const budget = budgetFor(s.algorithm, intent);
   const scale = Math.max(1, Math.round(s.scale));
   const width = Math.ceil(input.width / scale),
     height = Math.ceil(input.height / scale);
@@ -168,7 +173,9 @@ export function processImage(input: Pixels, s: Settings): Pixels {
           (v) => (Math.round((clamp(v) / 255) * (s.levels - 1)) * 255) / (s.levels - 1),
         ) as RGB)
       : match(r, g, b);
-  const special = advancedDither(work, alpha, width, height, s, quantize, encode);
+  const remaining = remainingDither(work, alpha, width, height, s, quantize, encode, budget);
+  const special =
+    remaining?.data || advancedDither(work, alpha, width, height, s, quantize, encode, budget);
   const output = special || new Uint8ClampedArray(width * height * 4);
   if (!special)
     for (let y = 0; y < height; y++) {
@@ -211,6 +218,7 @@ export function processImage(input: Pixels, s: Settings): Pixels {
       }
     }
   const effected = applyEffects({ width, height, data: output }, s.effects, s.seed);
+  if (remaining?.notice) effected.notice = remaining.notice;
   if (scale === 1) return effected;
   const full = new Uint8ClampedArray(input.width * input.height * 4);
   for (let y = 0; y < input.height; y++)
@@ -222,5 +230,10 @@ export function processImage(input: Pixels, s: Settings): Pixels {
       full[q + 2] = effected.data[p + 2];
       full[q + 3] = input.data[q + 3];
     }
-  return { width: input.width, height: input.height, data: full };
+  return {
+    width: input.width,
+    height: input.height,
+    data: full,
+    ...(remaining?.notice ? { notice: remaining.notice } : {}),
+  };
 }

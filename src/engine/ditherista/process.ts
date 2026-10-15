@@ -1,3 +1,4 @@
+import type { WorkBudget } from '../limits';
 // Modified TypeScript adaptations of libdither's matrix, dot, tile and Riemersma methods.
 // Copyright (C) 2022-2025 Robert Kist. See public/licenses/libdither*.txt.
 import type { RGB, Settings, Kernel } from '../catalog';
@@ -143,6 +144,7 @@ export function advancedDither(
   s: Settings,
   quantize: Quantize,
   encode: (c: RGB) => RGB,
+  budget?: WorkBudget,
 ): Uint8ClampedArray | null {
   const dot = dotMatrices[s.algorithm],
     tile = tileSets[s.algorithm],
@@ -172,6 +174,7 @@ export function advancedDither(
     const sum = original ? 1 : weights.reduce((a, b) => a + b, 0);
     let head = 0;
     visitHilbert(width, height, (x, y) => {
+      budget?.tick(length);
       const n = y * width + x,
         p = n * 3;
       if (!alpha[n]) {

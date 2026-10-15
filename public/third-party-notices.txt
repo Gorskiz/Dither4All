@@ -27,4 +27,7 @@ Required bundled notices and upstream credits: ./licenses/libdither-additional.t
 Adapted numeric threshold/class/tile tables and variable-error coefficients are in
 src/engine/ditherista/data.ts; TypeScript algorithms are modified browser adaptations.
 The blue-noise threshold texture is by Christoph Peters, CC0 1.0, via libdither.
-No Ditherista GUI, Qt code, icons, example artwork, kdtree or uthash implementation is shipped.
+No Ditherista GUI, Qt code, icons, example artwork, native kdtree C implementation or uthash implementation is shipped.
+Additional modified adaptations include DBS (Robert Kist / Sankar Srinivasan),
+Lippens-Philips tables and rank diffusion, exact L-system rules, grid/auto-threshold,
+and a TypeScript KD-tree palette implementation with finite initialization.

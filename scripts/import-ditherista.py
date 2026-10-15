@@ -51,10 +51,32 @@ for size in [2,4]:
 # Kacker–Allebach arrays are nested; extract their complete numeric initializer.
 text=(src/'dither_kallebach_data.h').read_text();body=text[text.index('=')+1:text.index(';')];allebach=[int(v) for v in re.findall(r'\b\d+\b',body)];assert len(allebach)==4096
 meta.append(['kacker-allebach','Kacker–Allebach','Ordered','Alternating 32 × 32 screens reduce repeating seams. Seed selects the arrangement.'])
+# Remaining method data: nested class matrices and exact L-system rules.
+lippens=arrays('dither_dotlippens_data.h')
+assert len(lippens['dotlippens_class_matrix'])==128*128
+for i in range(1,4): assert len(lippens[f'dotlippens{i}_coe'])==25
+curve_text=(src/'dither_riemersma_data.h').read_text(); curves={}
+for name,base,add,exp,center,label in [
+ ('hilbert_mod',2,0,1,'x','Modified Hilbert'),('peano',3,0,0,'none','Peano'),
+ ('fass0',4,0,0,'none','FASS 0'),('fass1',3,0,0,'none','FASS 1'),('fass2',4,0,0,'none','FASS 2'),
+ ('gosper',5,-1,0,'none','Gosper'),('fass_spiral',3,0,0,'xy','FASS spiral')]:
+    axiom=re.search(rf'{name}_axiom = "([^"]*)"',curve_text)[1]
+    keys=re.findall(r"'([^']*)'",re.search(rf'{name}_keys\[\] = \{{(.*?)\}};',curve_text,re.S)[1])
+    rules=re.findall(r'"([^"]*)"',re.search(rf'{name}_rules\[\]\s*=\s*\{{(.*?)\}};',curve_text,re.S)[1])
+    orient=[int(v) for v in re.findall(r'-?\d+',re.search(rf'{name}_orientation\[2\] = \{{(.*?)\}};',curve_text,re.S)[1])]
+    curves[name]={'axiom':axiom,'rules':dict(zip(keys,rules)),'base':base,'add':add,'exp':exp,'center':center,'orientation':orient}
+    for original in [False,True]:
+        meta.append(['curve-'+name.replace('_','-')+('-original' if original else ''), 'Riemersma · '+label+(' · original' if original else ''),'Curve diffusion','Exact upstream L-system with streamed, pruned traversal and bounded work.'])
+for i in range(7):meta.append([f'dbs-{i}',f'DBS · formula {i+1}','Optimization','Gaussian direct binary search with toggle/swap optimization. Two-ink output; bounded passes, work and resolution.'])
+for name,label in [('1','Lippens–Philips 1'),('2','Lippens–Philips 2'),('3','Lippens–Philips 3'),('guoliu','Lippens · Guo–Liu'),('mese','Lippens · Mese'),('knuth','Lippens · Knuth')]:
+    meta.append(['lippens-'+name,label,'Lippens–Philips','Class-bucket dot diffusion with a 5 × 5 coefficient kernel. Bounded processing.'])
+for name,label in [('random','Grid · random draws'),('balanced','Grid · balanced placement')]:
+    meta.append(['grid-'+name,label,'Grid','Seeded cell-based two-ink dithering. Adjustable cell width, height and minimum ink.'])
+meta.append(['auto-threshold','Automatic threshold','Other','Adapts the threshold to the source tone range and mean, following libdither. Two-ink output.'])
 def write(name,obj):return f'export const {name} = '+json.dumps(obj,separators=(',',':'))+';\n'
 (dest/'data.ts').write_text(header+'''export interface Matrix { width:number; height:number; divisor:number; values:number[] }
 export interface DotMatrix { size:number; values:number[]; weights:number[] }
 export interface TileSet { width:number; height:number; count:number; values:number[] }
-'''+write('orderedMatrices: Record<string,Matrix>',ordered)+write('dotMatrices: Record<string,DotMatrix>',dots)+write('tileSets: Record<string,TileSet>',tiles)+write('extraKernels: Record<string, readonly (readonly [number,number,number])[]>',kernels)+write('variableData',variable)+write('allebachMatrices',allebach))
+'''+write('orderedMatrices: Record<string,Matrix>',ordered)+write('dotMatrices: Record<string,DotMatrix>',dots)+write('tileSets: Record<string,TileSet>',tiles)+write('extraKernels: Record<string, readonly (readonly [number,number,number])[]>',kernels)+write('variableData',variable)+write('allebachMatrices',allebach)+write('lippensData', {k:v for k,v in lippens.items() if k.startswith('dotlippens')})+write('curveDefinitions: Record<string, {axiom:string;rules:Record<string,string>;base:number;add:number;exp:number;center:string;orientation:number[]}>',curves))
 (dest/'catalog.ts').write_text(header+'export const additionalAlgorithms = '+json.dumps(meta,indent=2)+' as const;\n')
 print(f'Imported {len(meta)} styles from {sha}')

@@ -213,9 +213,13 @@ export interface Effect {
 }
 export interface Settings {
   algorithm: AlgorithmId;
+  dbsPasses: number;
+  gridWidth: number;
+  gridHeight: number;
+  gridMinimum: number;
   workingSpace: 'srgb' | 'linear';
   colorDistance: 'weighted-rgb' | 'rgb' | 'lab' | 'ciede2000' | 'luminance';
-  quantizer: 'median-cut' | 'wu' | 'kmeans';
+  quantizer: 'median-cut' | 'wu' | 'kmeans' | 'kdtree';
   serpentine: boolean;
   jitter: number;
   matrixRotation: number;
@@ -238,6 +242,10 @@ export interface Settings {
 }
 export const defaults: Settings = {
   algorithm: 'floyd-steinberg',
+  dbsPasses: 2,
+  gridWidth: 4,
+  gridHeight: 4,
+  gridMinimum: 0,
   workingSpace: 'srgb',
   colorDistance: 'weighted-rgb',
   quantizer: 'median-cut',
@@ -298,11 +306,23 @@ export function validateSettings(value: unknown): Settings {
   if (!algorithms.some((a) => a[0] === s.algorithm))
     throw new Error('Unknown dithering algorithm.');
   result.algorithm = s.algorithm as AlgorithmId;
+  for (const [key, lo, hi] of [
+    ['dbsPasses', 1, 8],
+    ['gridWidth', 1, 32],
+    ['gridHeight', 1, 32],
+    ['gridMinimum', 0, 4096],
+  ] as const) {
+    const value = s[key];
+    if (value === undefined) continue;
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < lo || value > hi)
+      throw new Error(`Invalid ${key} setting.`);
+    result[key] = value;
+  }
   // Older recipes omit these fields. New values remain strictly validated.
   for (const [key, values] of Object.entries({
     workingSpace: ['srgb', 'linear'],
     colorDistance: ['weighted-rgb', 'rgb', 'lab', 'ciede2000', 'luminance'],
-    quantizer: ['median-cut', 'wu', 'kmeans'],
+    quantizer: ['median-cut', 'wu', 'kmeans', 'kdtree'],
   })) {
     if (s[key] === undefined) continue;
     if (typeof s[key] !== 'string' || !values.includes(s[key] as string))

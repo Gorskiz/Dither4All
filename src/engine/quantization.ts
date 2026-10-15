@@ -1,6 +1,6 @@
 import type { RGB } from './catalog';
 import { extractPalette, hexRGB, luminance, rgbHex } from './color';
-export type Quantizer = 'median-cut' | 'wu' | 'kmeans';
+export type Quantizer = 'median-cut' | 'wu' | 'kmeans' | 'kdtree';
 function sampleColors(data: Uint8ClampedArray): RGB[] {
   const points: RGB[] = [],
     stride = Math.max(1, Math.floor(data.length / 4 / 16000));
@@ -66,6 +66,61 @@ function kmeans(points: RGB[], count: number): RGB[] {
       }
     });
     if (movement < 0.05) break;
+  }
+  return centers;
+}
+/** KD-tree accelerated unique-color Lloyd quantization (libdither's third method).
+ * Modified initialization is finite for small/solid palettes, and tie breaks are stable.
+ * Robert Kist's method; see public/licenses/libdither*.txt. No native kdtree code is used.
+ */
+function kdtreeQuantize(points: RGB[], count: number): RGB[] {
+  const unique = [...new Map(points.map((p) => [p.join(','), p])).values()];
+  const size = Math.min(count, unique.length);
+  let centers = Array.from(
+    { length: size },
+    (_, i) => [...unique[Math.floor((i * unique.length) / size)]] as RGB,
+  );
+  type Node = { index: number; axis: number; left: Node | null; right: Node | null };
+  const distance = (a: RGB, b: RGB) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+  for (let pass = 0; pass < 10; pass++) {
+    const build = (indices: number[], depth = 0): Node | null => {
+      if (!indices.length) return null;
+      const axis = depth % 3;
+      indices.sort((a, b) => centers[a][axis] - centers[b][axis] || a - b);
+      const middle = Math.floor(indices.length / 2);
+      return {
+        index: indices[middle],
+        axis,
+        left: build(indices.slice(0, middle), depth + 1),
+        right: build(indices.slice(middle + 1), depth + 1),
+      };
+    };
+    const root = build(centers.map((_, i) => i)),
+      sums = centers.map(() => [0, 0, 0, 0]);
+    for (const point of unique) {
+      let best = 0,
+        bestDistance = Infinity;
+      const search = (node: Node | null): void => {
+        if (!node) return;
+        const value = distance(point, centers[node.index]);
+        if (value < bestDistance || (value === bestDistance && node.index < best)) {
+          best = node.index;
+          bestDistance = value;
+        }
+        const diff = point[node.axis] - centers[node.index][node.axis];
+        search(diff <= 0 ? node.left : node.right);
+        if (diff * diff <= bestDistance) search(diff <= 0 ? node.right : node.left);
+      };
+      search(root);
+      for (let c = 0; c < 3; c++) sums[best][c] += point[c];
+      sums[best][3]++;
+    }
+    const next = centers.map((c, i) =>
+      sums[i][3] ? (sums[i].slice(0, 3).map((v) => Math.floor(v / sums[i][3])) as RGB) : c,
+    );
+    const stable = next.every((c, i) => distance(c, centers[i]) === 0);
+    centers = next;
+    if (stable) break;
   }
   return centers;
 }
@@ -158,5 +213,11 @@ export function quantizePalette(
     throw new Error('Extract between 2 and 256 colors.');
   if (method === 'median-cut') return extractPalette(data, count);
   const points = sampleColors(data);
-  return finish(method === 'wu' ? wu(points, count) : kmeans(points, count));
+  return finish(
+    method === 'wu'
+      ? wu(points, count)
+      : method === 'kdtree'
+        ? kdtreeQuantize(points, count)
+        : kmeans(points, count),
+  );
 }

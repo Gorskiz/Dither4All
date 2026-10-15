@@ -24,9 +24,9 @@ const image = (w = 19, h = 13) => ({
 });
 describe('Ditherista adaptations', () => {
   it('imports a complete catalog of valid tables without losing existing styles', () => {
-    expect(algorithms).toHaveLength(96);
-    expect(additionalAlgorithms).toHaveLength(64);
-    expect(new Set(algorithms.map((a) => a[0])).size).toBe(96);
+    expect(algorithms).toHaveLength(126);
+    expect(additionalAlgorithms).toHaveLength(94);
+    expect(new Set(algorithms.map((a) => a[0])).size).toBe(126);
     for (const m of Object.values(orderedMatrices)) {
       expect(m.values).toHaveLength(m.width * m.height);
       expect(m.divisor).toBeGreaterThan(0);
