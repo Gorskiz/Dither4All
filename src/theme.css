@@ -1,0 +1,12 @@
+:root {
+  --paper: #f4f3e9;
+  --panel: #f0f1e6;
+  --ink: #20271f;
+  --muted: #78806e;
+  --line: #d7dbcc;
+  --lime: #d7ed83;
+  --olive: #6d7d39;
+  --orange: #d75a35;
+  --canvas: #dce2cf;
+  color-scheme: light;
+}
