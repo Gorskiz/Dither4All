@@ -905,11 +905,13 @@ document.addEventListener('keydown', (e) => {
   if (!e.ctrlKey && !e.metaKey && ['+', '=', '-', '.'].includes(e.key)) {
     e.preventDefault();
     const zoom = $<HTMLSelectElement>('zoom');
-    const values = ['fit', '50', '100', '200'];
-    zoom.value =
-      e.key === '.'
-        ? 'fit'
-        : values[Math.max(0, Math.min(3, values.indexOf(zoom.value) + (e.key === '-' ? -1 : 1)))];
+    const current =
+      zoom.value === 'fit'
+        ? ($('canvas-frame').clientWidth / source.width) * 100
+        : Number(zoom.value);
+    const values = e.key === '-' ? [200, 100, 50] : [50, 100, 200];
+    const next = values.find((v) => (e.key === '-' ? v < current - 0.01 : v > current + 0.01));
+    zoom.value = e.key === '.' ? 'fit' : next === undefined ? zoom.value : String(next);
     updateZoom();
     return;
   }

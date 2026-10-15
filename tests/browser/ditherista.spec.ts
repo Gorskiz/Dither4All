@@ -50,7 +50,7 @@ test('expanded styles, perceptual controls, worker palette extraction and portab
   await page.screenshot({ path: 'test-results/ditherista-desktop.png', fullPage: true });
   await page.locator('#output-canvas').click();
   await page.keyboard.press('+');
-  await expect(page.getByLabel('Zoom', { exact: true })).toHaveValue('50');
+  await expect(page.getByLabel('Zoom', { exact: true })).toHaveValue('100');
   await page.keyboard.press('.');
   await expect(page.getByLabel('Zoom', { exact: true })).toHaveValue('fit');
   await page.setViewportSize({ width: 390, height: 844 });
