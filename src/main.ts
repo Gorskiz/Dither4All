@@ -86,7 +86,7 @@ $('app').innerHTML = `
           <div class="tab-content" id="tab-palette" role="tabpanel" aria-labelledby="palette-tab" hidden>
             <div class="section-title"><h2>Pick your ink</h2><span class="count" id="palette-count">2</span></div><p class="hint">Small palettes. Big personalities.</p>
             <label class="field-label" for="color-mode">Color mode</label><select id="color-mode"><option value="palette">Custom palette</option><option value="rgb">Full color · RGB quantization</option></select>
-            <div id="rgb-controls" hidden>${slider('levels', 'Levels per channel', 2, 16)}</div>
+            <p id="cmyk-note" class="tip" hidden>CMYK uses source colors for four ink screens. Choose another texture to use a custom palette.</p><div id="rgb-controls" hidden>${slider('levels', 'Levels per channel', 2, 16)}</div>
             <div id="palette-controls"><label class="field-label" for="palette-select">Palette library</label><select id="palette-select">${palettes.map((p, i) => `<option value="${i}">${p.name}</option>`).join('')}<option value="custom">Custom palette</option></select>
             <div id="palette-colors" class="palette-colors"></div><button id="add-color" class="outline-button full-width">${icon('plus')} Add color</button>
             <div class="extract-row"><label for="extract-count">Extract colors</label><select id="extract-count">${[2, 3, 4, 6, 8, 12, 16].map((n) => `<option${n === 6 ? ' selected' : ''}>${n}</option>`).join('')}</select></div><button id="extract" class="outline-button full-width">↳ Extract from image</button>
@@ -355,8 +355,20 @@ function syncControls() {
   $<HTMLInputElement>('invert').checked = settings.invert;
   $<HTMLInputElement>('seed').value = String(settings.seed);
   $<HTMLSelectElement>('color-mode').value = settings.colorMode;
-  $('rgb-controls').hidden = settings.colorMode !== 'rgb';
-  $('palette-controls').hidden = settings.colorMode === 'rgb';
+  const cmyk = settings.algorithm === 'cmyk';
+  $('cmyk-note').hidden = !cmyk;
+  $<HTMLSelectElement>('color-mode').disabled = cmyk;
+  $('rgb-controls').hidden = cmyk || settings.colorMode !== 'rgb';
+  $('palette-controls').hidden = cmyk || settings.colorMode === 'rgb';
+  const pattern = algorithms.find((a) => a[0] === settings.algorithm)?.[2] === 'Pattern';
+  $<HTMLInputElement>('patternSize').disabled = !pattern;
+  $<HTMLInputElement>('strength').disabled = cmyk || settings.algorithm === 'threshold';
+  $<HTMLInputElement>('threshold').disabled = cmyk;
+  for (const id of ['patternSize', 'strength', 'threshold']) {
+    document
+      .querySelector(`label[for="${id}"]`)
+      ?.setAttribute('aria-disabled', String($<HTMLInputElement>(id).disabled));
+  }
   const paletteIndex = palettes.findIndex(
     (p) => JSON.stringify(p.colors) === JSON.stringify(settings.palette),
   );

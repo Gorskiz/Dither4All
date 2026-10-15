@@ -511,6 +511,13 @@ input[type='range']::-moz-range-thumb {
   border: 2px solid var(--panel);
   border-radius: 1px;
 }
+input[type='range']:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.slider-label[aria-disabled='true'] {
+  opacity: 0.6;
+}
 .seed-row {
   display: flex;
   align-items: center;
