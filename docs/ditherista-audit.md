@@ -10,29 +10,34 @@ Reviewed 2026-10-15 at the user's request to adopt useful Ditherista features.
 
 ## Adopted
 
-| Upstream capability        | Dither4All integration                                                                                                                                                                                                               |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Ordered matrices           | All distinct fixed matrix definitions not already represented, plus CC0 blue noise, variable 2×2/4×4 and Kacker–Allebach. Rotation and variable matrix spacing exposed inline.                                                       |
-| Additional fixed diffusion | Xot, diagonal, Shiau Fan 2, 1D, 2D, Steve Pigeon and Robert Kist kernels, preserving existing identifiers and output defaults.                                                                                                       |
-| Variable diffusion         | Ostromoukhov and Zhou–Fang coefficient tables; original-tone selection, seeded noise and palette/color adaptations.                                                                                                                  |
-| Dot diffusion              | Knuth, mini/optimized Knuth, Mese 8/16, Guo–Liu 8/16, spiral/inverted spiral. Floating-point weights and transparent/partial-edge handling.                                                                                          |
-| Pattern tiles              | Six upstream binary tile sets with block matching. Uses darkest/lightest palette inks and processes partial edge blocks.                                                                                                             |
-| Riemersma                  | Original and modified weighted error histories along a Hilbert curve. Traversal prunes out-of-image quadrants and covers every pixel, including the origin.                                                                          |
-| Serpentine and jitter      | Independent controls across fixed/variable diffusion; deterministic jitter across applicable families. Legacy scanning aliases still load unchanged.                                                                                 |
-| Linear color               | Optional linear-light downsampling, tonal processing and error diffusion; output re-encoded before effects. Classic sRGB remains the compatible default.                                                                             |
-| Color matching             | Weighted RGB, RGB, CIELAB ΔE76, CIEDE2000 and luminance. Palette coordinates precomputed; CIEDE2000 equation independently implemented and reference-tested.                                                                         |
-| Palette quantization       | Existing median cut plus new independent Wu and deterministic K-means implementations. Extraction runs in a worker. Palette capacity expanded to 256. K-means is our third method, not a claim to port upstream's KD-tree quantizer. |
-| Workflow                   | Searchable style catalog, contextual method options, +/− zoom, period/double-click to fit, continuous inspector and scrollable large-palette swatches.                                                                               |
-| Shared processing          | New image methods/settings also work in projects, presets, batch and motion exports through the shared worker.                                                                                                                       |
+| Upstream capability        | Dither4All integration                                                                                                                                                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Ordered matrices           | All distinct fixed matrix definitions not already represented, plus CC0 blue noise, variable 2×2/4×4 and Kacker–Allebach. Rotation and variable matrix spacing exposed inline.                                                                               |
+| Additional fixed diffusion | Xot, diagonal, Shiau Fan 2, 1D, 2D, Steve Pigeon and Robert Kist kernels, preserving existing identifiers and output defaults.                                                                                                                               |
+| Variable diffusion         | Ostromoukhov and Zhou–Fang coefficient tables; original-tone selection, seeded noise and palette/color adaptations.                                                                                                                                          |
+| Dot diffusion              | Knuth, mini/optimized Knuth, Mese 8/16, Guo–Liu 8/16, spiral/inverted spiral. Floating-point weights and transparent/partial-edge handling.                                                                                                                  |
+| Pattern tiles              | Six upstream binary tile sets with block matching. Uses darkest/lightest palette inks and processes partial edge blocks.                                                                                                                                     |
+| Riemersma                  | Original and modified weighted error histories along Hilbert and all seven additional upstream L-system curves. Traversal prunes out-of-image quadrants and covers every pixel, including the origin.                                                        |
+| Serpentine and jitter      | Independent controls across fixed/variable diffusion; deterministic jitter across applicable families. Legacy scanning aliases still load unchanged.                                                                                                         |
+| Linear color               | Optional linear-light downsampling, tonal processing and error diffusion; output re-encoded before effects. Classic sRGB remains the compatible default.                                                                                                     |
+| Color matching             | Weighted RGB, RGB, CIELAB ΔE76, CIEDE2000 and luminance. Palette coordinates precomputed; CIEDE2000 equation independently implemented and reference-tested.                                                                                                 |
+| Palette quantization       | Existing median cut plus Wu, deterministic K-means and bounded KD-tree extraction. Extraction runs in a worker. Palette capacity expanded to 256. The KD-tree method uses finite deterministic initialization and at most 10 unique-color refinement passes. |
+| Workflow                   | Searchable style catalog, contextual method options, +/− zoom, period/double-click to fit, continuous inspector and scrollable large-palette swatches.                                                                                                       |
+| Shared processing          | New image methods/settings also work in projects, presets, batch and motion exports through the shared worker.                                                                                                                                               |
 
-There are now 96 selectable styles, 64 newly added. Matrix variants and the three legacy serpentine aliases are counted as styles, not newly invented algorithm families. Original algorithms/presets are preserved.
+There are now 126 selectable styles, 94 adapted additions to the original 32. Version 0.4 completes the remaining dithering families with 30 more styles. Matrix variants and the three legacy serpentine aliases are counted as styles, not newly invented algorithm families. Original algorithms/presets are preserved.
 
-## Deliberately outside this integration
+## Remaining-family integration (version 0.4)
 
-- Direct Binary Search, Lippens/Philips, the additional L-system curves, and the specialized grid algorithm were inspected but not ported. They need separate fidelity/performance work; their names are not added as aliases for unrelated methods. DBS is particularly expensive for interactive video.
-- Ditherista's native Qt windowing, installers, update checker, platform clipboard code, icons and sample artwork are desktop-specific and are not shipped.
-- Full upstream color-model/illuminant/component-weight controls and its KD-tree quantizer are not reproduced. The browser exposes five explicit matching modes, D65 Lab, and three usable quantizers rather than claiming complete parity.
-- Native encoding support does not change: browser codecs and the existing motion export limits still apply.
+- All seven DBS formulas use genuine toggle/swap optimization, bounded passes and worker budgets.
+- All six Lippens–Philips variants use the upstream class/coefficient data with efficient rank buckets.
+- All seven additional curve definitions are available with original and modified histories: modified Hilbert, Peano, FASS 0/1/2, Gosper and FASS spiral.
+- Both grid modes and automatic thresholding are available, with seeded randomness and transparent/partial-cell fixes.
+- The KD-tree palette method is included with finite initialization and bounded refinement.
+
+See [performance limits](performance-limits.md) for exact pixel/frame/time limits, cancellation behavior and fidelity differences. This completes the dithering families invoked by the upstream method dispatchers; styles include variants and parameters, not 126 unrelated algorithms.
+
+Desktop Qt windowing/installers, native platform services, icons and sample artwork remain outside the web app. Color-model/illuminant/component-weight controls beyond the existing five matching modes are not claimed. Browser codec availability and media limits still apply.
 
 ## Attribution and reproducibility
 

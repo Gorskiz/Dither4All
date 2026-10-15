@@ -21,9 +21,9 @@ Requires Node.js 22.12+; Node.js 24 is used in CI.
 
 ## What you can make
 
-- **96 selectable styles:** 64 additions adapted from Ditherista/libdither, including blue noise, clustered/dispersed matrices, dot diffusion, binary tiles, Ostromoukhov/Zhou–Fang and Hilbert-curve Riemersma. The original 32 styles remain available. Search the style list; adjust jitter, serpentine scanning and relevant matrix/curve parameters.
+- **126 selectable styles:** 94 additions adapted from Ditherista/libdither, including blue noise, clustered/dispersed matrices, dot diffusion, binary tiles, Ostromoukhov/Zhou–Fang and Hilbert-curve Riemersma. The original 32 styles remain available. Now includes bounded DBS (7 formulas), all Lippens–Philips variants, all upstream curve definitions, grid and automatic thresholding. Search the style list; adjust contextual parameters. [Heavy-method limits](docs/performance-limits.md).
 - **24 stackable effects:** glow, bloom, chromatic aberration, RGB split, scanlines, grain, vignette, color adjustments, distortion, glitch, edge ink, and more. Toggle, reorder, or adjust up to 12 layers.
-- **Color:** 12 built-in palettes, editable 2–256-color palettes, median-cut/Wu/K-means extraction, RGB quantization, and JSON/hex/GIMP palette imports and exports.
+- **Color:** 12 built-in palettes, editable 2–256-color palettes, median-cut/Wu/K-means/KD-tree extraction, RGB quantization, and JSON/hex/GIMP palette imports and exports.
 - **Color science:** classic sRGB or linear-light averaging/diffusion; weighted RGB, Euclidean RGB, CIELAB, CIEDE2000 or luminance-only palette matching. Existing recipes retain their classic defaults.
 - **Image adjustments:** pixel scale, strength, threshold, pattern size, brightness, contrast, gamma, saturation, inversion, and a reproducible random seed.
 - **Workflow:** a continuous photo-editor inspector beside a persistent canvas, before/after comparison, zoom, undo/redo, drag and drop, clipboard paste/copy, five starting presets, saved browser presets, portable preset files, and settings links.
@@ -54,6 +54,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md), the [architecture](docs/architecture.md)
 - SVG: at most one megapixel. These are real filled pixel paths, not smooth contour tracing or embroidery machine instructions. Black SVG drops pixels with luminance ≥128.
 - Batch: 20 files, 100 MB total input, 250 MB total encoded output. Files are processed sequentially; cancel stops the current worker. Batch always exports original-size PNGs using a snapshot of the current settings.
 - Effect layers run after dithering and may introduce colors outside the selected palette. Effects use the reduced pixel grid, then the result is expanded without changing the source dimensions.
+- Heavy methods enforce working-grid, operation and worker-time budgets; previews are capped per method. Motion has stricter per-frame/total-frame limits, and DBS is capped at 12 FPS. Exports reject oversized work with actionable errors.
 - Large images and long effect stacks can be slow or memory-intensive on phones. Motion exports: up to 30 seconds, 900 frames, longest side 1280 px (GIF: 640 px). Inputs: 500 MB, 2 hours, 16 MP/frame. WebCodecs support varies; try another output format if a codec is unavailable.
 
 ## License and independence

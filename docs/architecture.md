@@ -50,3 +50,11 @@ Projects retain v1 compatibility, with optional validated motion metadata. Still
 `perceptual.ts` converts sRGB/linear RGB to D65 CIELAB and creates a matcher that precomputes palette coordinates once per image. CIEDE2000 is intentionally labeled slower. `quantization.ts` implements bounded Wu and deterministic K-means extraction alongside the existing median cut. A dedicated `palette-worker.ts` keeps extraction off the UI thread; stale results are discarded when the source changes.
 
 Optional new recipe fields receive classic defaults when missing; invalid supplied values are rejected. Projects, saved presets, settings links, batch exports and video exports share the same validated Settings contract. Palettes can contain up to 256 colors. Large perceptual palettes can be expensive in motion previews; the preview remains adaptive and exports render every frame.
+
+## Bounded methods
+
+`engine/limits.ts` defines method-specific working-grid/motion caps and amortized work/deadline guards. `ditherista/dbs.ts` implements bounded filtered-error toggle/swap optimization; `curves.ts` caches L-system subtree transforms/bounds for streamed, pruned traversal; `remaining.ts` dispatches Lippens rank buckets, curve histories, grid and auto-threshold.
+
+`motion/processor.ts` now owns the shared persistent-worker protocol, intent (preview/export), AbortSignal cancellation and main-thread watchdogs. Main image jobs use disposable instances of the same processor, so batch, still and motion processing share hard termination/recovery behavior. Worker-side size validation is repeated before algorithm buffers are allocated; image/motion exports additionally preflight before reading full pixel buffers or initializing encoders. Heavy motion jobs have an independent 90-second deadline, with decoder/encoder cleanup in `finally`.
+
+See [performance limits](performance-limits.md) for exact budgets and output notices. Legacy recipes receive defaults for the new DBS/grid parameters; malformed values are rejected.

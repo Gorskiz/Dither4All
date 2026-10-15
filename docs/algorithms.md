@@ -23,7 +23,7 @@ CMYK screens use angles 15°, 75°, 0°, and 45°. Darker channels increase dot 
 
 ## Color and effects
 
-Palette extraction uses bounded sampling (up to about 16,000 points), with median cut, variance-minimizing Wu quantization or deterministic K-means (at most 16 refinement passes). Extraction runs in a worker. Semi-transparent colors are ignored during palette extraction below 50% opacity. Image downsampling uses opacity-weighted averages in the selected working space. Linear mode decodes sRGB before averaging, adjusts tones and diffuses errors in linear RGB, then re-encodes before applying artistic effects. CMYK retains its original RGB ink simulation. RGB quantization uses 2–16 discrete levels per channel.
+Palette extraction uses bounded sampling (up to about 16,000 points), with median cut, variance-minimizing Wu quantization, deterministic K-means or unique-color KD-tree refinement (at most 16 refinement passes). Extraction runs in a worker. Semi-transparent colors are ignored during palette extraction below 50% opacity. Image downsampling uses opacity-weighted averages in the selected working space. Linear mode decodes sRGB before averaging, adjusts tones and diffuses errors in linear RGB, then re-encodes before applying artistic effects. CMYK retains its original RGB ink simulation. RGB quantization uses 2–16 discrete levels per channel.
 
 Glow and bloom use separable box blur. Other effects use color matrices, quantization, deterministic noise, or coordinate remapping. These are original creative interpretations, not reimplementations of any product's proprietary effects.
 
@@ -40,3 +40,7 @@ Ostromoukhov and Zhou–Fang coefficients are selected using the original, adjus
 Riemersma uses a bounded, pruned Hilbert traversal with original or normalized modified error histories. Transparent pixels clear the history. All pixels, including the origin and thin-image edges, are visited exactly once. This avoids constructing exponentially large curve strings.
 
 CIEDE2000 implements the published equation with kL=kC=kH=1 and is tested against published supplementary pairs: [Sharma, Wu and Dalal](https://hajim.rochester.edu/ece/sites/gsharma/ciede2000/). CIELAB conversions use sRGB primaries and D65 white. No ICC color-management system is implied.
+
+## Remaining native families and bounded optimization
+
+Version 0.4 includes DBS's seven filter formulas, six Lippens–Philips variants, fourteen additional curve/history combinations, both grid modes, automatic threshold and the KD-tree palette method. Their adaptation details, objective, traversal and resource limits are described in [performance limits](performance-limits.md). DBS reports convergence/pass-limit status; work/time failures do not produce partial exported files.

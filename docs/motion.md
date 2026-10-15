@@ -36,3 +36,7 @@ Save project retains image settings, motion controls, trim and keyframes. Still 
 Style presets, settings links, and image undo/redo affect the image recipe. Motion keys/settings are edited in the timeline and saved in projects. Animated image imports currently use one frame; video containers provide moving sources. There is no multi-track editing, motion tracking, transition editor or automatic subject segmentation.
 
 Everything runs locally with bundled libraries. No upload, account, API key, remote codec service, microphone access or recording permission is required. See [licenses](../public/third-party-notices.txt).
+
+## Heavy methods
+
+DBS, curves, Lippens–Philips, grid and auto-threshold enforce tighter working-grid/frame-count limits and a 90-second motion-export deadline. DBS is limited to 12 FPS. Use the new 128/256 px sizes, shorten the selection or increase Pixel scale. Preflight considers low-scale keyframes too. See [the full budget table](performance-limits.md). Cancel preview pauses playback and stops its worker; settings changes can start it again.
