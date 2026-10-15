@@ -1211,3 +1211,19 @@ dialog > a {
 .palette-actions select {
   max-width: 55px;
 }
+
+.inspector-actions {
+  flex-wrap: wrap;
+}
+#cancel-image-export {
+  flex: 0 0 100%;
+  min-height: 24px;
+}
+#cancel-preview {
+  white-space: nowrap;
+  color: var(--accent);
+}
+.budget-hint {
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
+}

@@ -1,3 +1,4 @@
+import { methodLimits } from '../engine/limits';
 import { cloneSettings, type Settings } from '../engine/catalog';
 import { canvasPixels, download } from '../files';
 import { FrameProcessor } from './processor';
@@ -36,6 +37,8 @@ interface Host {
   error: (error: unknown) => void;
 }
 export class MotionEditor {
+  private previewStopped = false;
+  private previewSignature = '';
   active = false;
   busy = false;
   video: VideoAsset | null = null;
@@ -86,7 +89,7 @@ export class MotionEditor {
         <div id="key-list" class="key-list"></div><p class="hint">Move the playhead, choose a value, then Set key. Keys override the matching adjustment. Style presets contain image settings; projects also keep the timeline.</p>
         <div class="section-title motion-subheading"><h3>Animation output</h3><button id="export-frame" class="small-link">Export current frame</button></div>
         <div class="field-row"><label for="motion-format">Motion format</label><select id="motion-format"><option value="mp4">MP4 · H.264</option><option value="webm">WebM · VP8</option><option value="gif">Animated GIF</option><option value="frames">PNG frames · ZIP</option></select></div>
-        <div class="field-row"><label for="motion-size">Longest side</label><select id="motion-size"><option>480</option><option selected>720</option><option>1280</option></select></div>
+        <div class="field-row"><label for="motion-size">Longest side</label><select id="motion-size"><option>128</option><option>256</option><option>480</option><option selected>720</option><option>1280</option></select></div>
         <label class="toggle-row" id="audio-row" hidden><input id="motion-audio" type="checkbox" checked> Include audio in video export</label>
         <p class="hint">MP4/WebM depend on browser codec support. GIF is capped at 640 px. Video and GIF use a black transparency matte. Preview is silent; source audio is preserved on export.</p>
         <progress id="motion-progress" max="1" value="0" hidden aria-label="Animation export progress"></progress><p id="motion-export-status" role="status"></p><button id="motion-cancel" class="outline-button" hidden>Cancel export</button>
@@ -409,7 +412,23 @@ export class MotionEditor {
     };
     tick();
   }
+  cancelPreview() {
+    this.previewStopped = true;
+    this.pause();
+    ++this.revision;
+    this.processor?.dispose();
+    this.processor = null;
+    el('cancel-preview').hidden = true;
+    el('render-status').textContent = 'Preview cancelled. Change a setting to render again.';
+  }
   refresh() {
+    const signature = JSON.stringify(this.host.settings()) + JSON.stringify(this.t);
+    if (this.rendering && signature !== this.previewSignature) {
+      this.processor?.dispose();
+      this.processor = null;
+    }
+    this.previewSignature = signature;
+    this.previewStopped = false;
     if (!this.active) return;
     ++this.revision;
     if (this.rendering) return;
@@ -419,13 +438,18 @@ export class MotionEditor {
     this.rendering = true;
     let requested = this.revision;
     try {
-      while (this.active) {
+      while (this.active && !this.previewStopped) {
         const version = this.revision,
           time = this.time,
           video = this.video;
         requested = version;
         const base = this.host.source(),
-          dims = outputDimensions(video?.width ?? base.width, video?.height ?? base.height, 640);
+          dims = outputDimensions(
+            video?.width ?? base.width,
+            video?.height ?? base.height,
+            methodLimits(this.host.settings().algorithm)?.previewSide ?? 640,
+          );
+        el('cancel-preview').hidden = !methodLimits(this.host.settings().algorithm);
         const frame = this.sink
           ? await this.sink.getCanvas(video!.first + Math.min(time, video!.duration - 0.00001))
           : null;
@@ -445,6 +469,7 @@ export class MotionEditor {
         const result = await this.processor.process(
           animateNoise(canvasPixels(raw), this.t, time, s.seed),
           s,
+          'preview',
         );
         if (version !== this.revision && !this.playing) continue;
         const original = el<HTMLCanvasElement>('original-canvas'),
@@ -465,21 +490,28 @@ export class MotionEditor {
           : `${base.width} × ${base.height} · ${this.duration.toFixed(2)} s`;
         el('render-status').textContent = this.pendingVideo
           ? 'Relink the original video to preview or export.'
-          : `Motion preview · ${dims.width} × ${dims.height} · ${this.t.fps} fps target`;
+          : `Motion preview · ${dims.width} × ${dims.height} · ${this.t.fps} fps target${result.notice ? ` · ${result.notice}` : ''}`;
         el('render-status').classList.remove('rendering');
+        el('cancel-preview').hidden = true;
         this.host.zoom();
         break;
       }
     } catch (e) {
       if (
         this.active &&
-        this.revision === requested &&
+        !this.previewStopped &&
         !(e instanceof DOMException && e.name === 'AbortError')
-      )
+      ) {
+        this.pause();
+        this.previewStopped = true;
+        requested = this.revision;
+        el('cancel-preview').hidden = true;
+        el('render-status').textContent = e instanceof Error ? e.message : 'Motion preview failed.';
         throw e;
+      }
     } finally {
       this.rendering = false;
-      if (this.active && this.revision !== requested) this.refresh();
+      if (this.active && !this.previewStopped && this.revision !== requested) this.refresh();
     }
   }
   project(): MotionProject | undefined {
@@ -516,7 +548,7 @@ export class MotionEditor {
         `Project opened. Open the original video “${this.pendingVideo.name}” to relink.`,
       );
   }
-  async currentFrame() {
+  async currentFrame(signal?: AbortSignal) {
     this.pause();
     if (this.pendingVideo) throw new Error('Relink the video first.');
     const base = this.host.source(),
@@ -543,6 +575,8 @@ export class MotionEditor {
           s.seed,
         ),
         s,
+        'export',
+        signal,
       );
     } finally {
       processor.dispose();

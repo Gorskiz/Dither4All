@@ -9,9 +9,9 @@ test('expanded styles, perceptual controls, worker palette extraction and portab
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
   await expect(page.locator('#render-status')).toContainText('ms');
-  await expect(page.locator('#algorithm-select option')).toHaveCount(96);
+  await expect(page.locator('#algorithm-select option')).toHaveCount(126);
   await page.getByLabel('Find', { exact: true }).fill('Knuth');
-  await expect(page.locator('#algorithm-select option:not([hidden])')).toHaveCount(4);
+  await expect(page.locator('#algorithm-select option:not([hidden])')).toHaveCount(5);
   await page.getByLabel('Style', { exact: true }).selectOption('dot-knuth');
   await expect(page.locator('#render-status')).toContainText('Knuth');
   await page.getByLabel('Find', { exact: true }).fill('');

@@ -1,3 +1,5 @@
+import { methodLimits, assertProcessingSize } from './engine/limits';
+import { FrameProcessor } from './motion/processor';
 import './style.css';
 import {
   algorithms,
@@ -71,10 +73,10 @@ $('app').innerHTML = `
           <div id="drop-zone" class="canvas-stage"><div class="drop-hint">Drop an image or video to open</div><div id="canvas-frame" class="canvas-frame"><canvas id="original-canvas" aria-label="Original image"></canvas><canvas id="output-canvas" aria-label="Dithered image"></canvas><div id="split-line" class="split-line" hidden><span>↔</span></div><span id="image-badge" class="sr-only">Dithered preview</span></div></div>
           <div id="compare-control" class="compare-control" hidden><label for="compare">Original / dithered split</label><input id="compare" type="range" min="0" max="100" value="50"></div>
           <div class="canvas-bottom"><span id="dimensions">1200 × 900</span><button id="sample" class="small-link">Use sample</button><label class="zoom-label" for="zoom">Zoom <select id="zoom" aria-label="Zoom"><option value="fit">Fit</option><option value="50">50%</option><option value="100">100%</option><option value="200">200%</option></select></label></div>
-          <div class="preview-status"><span id="render-status" role="status" aria-live="polite">Preparing preview…</span><span>${icon('shield')} Local processing</span></div>
+          <div class="preview-status"><span id="render-status" role="status" aria-live="polite">Preparing preview…</span><button id="cancel-preview" class="small-link" hidden>Cancel preview</button><span>${icon('shield')} Local processing</span></div>
         </section>
         <aside class="inspector" aria-label="Image controls">
-          <div class="inspector-actions"><button id="upload" class="outline-button">${icon('upload')} Open media</button><button id="export" class="export-button">Export image ${icon('download')}</button></div>
+          <div class="inspector-actions"><button id="upload" class="outline-button">${icon('upload')} Open media</button><button id="export" class="export-button">Export image ${icon('download')}</button><button id="cancel-image-export" class="small-link" hidden>Cancel export</button></div>
           <div class="inspector-body">
             <section class="panel-section" aria-labelledby="dither-heading"><div class="section-title"><h2 id="dither-heading">Dithering</h2><span class="count">${algorithms.length} styles</span></div>
               <div class="field-row style-search"><label for="style-search">Find</label><input id="style-search" type="search" placeholder="Search ${algorithms.length} styles" autocomplete="off"></div><div class="field-row"><label for="algorithm-select">Style</label><select id="algorithm-select">${[
@@ -83,6 +85,9 @@ $('app').innerHTML = `
                 'Curve diffusion',
                 'Dot diffusion',
                 'Tiles',
+                'Optimization',
+                'Lippens–Philips',
+                'Grid',
                 'Ordered',
                 'Pattern',
                 'Other',
@@ -96,7 +101,7 @@ $('app').innerHTML = `
                 )
                 .join('')}</select></div>
               <div class="field-row"><label for="builtin-preset">Preset</label><select id="builtin-preset"><option value="custom">Custom settings</option><option value="0">The original</option><option value="1">Pocket nostalgia</option><option value="2">After hours</option><option value="3">Print club</option><option value="4">Signal lost</option></select><button id="shuffle" class="icon-button" aria-label="Randomize style" title="Randomize style">${icon('shuffle')}</button></div>
-              <p id="algorithm-description" class="hint"></p>
+              <p id="algorithm-description" class="hint"></p><p id="method-budget" class="hint budget-hint" hidden></p><div id="dbs-controls" class="control-section" hidden>${slider('dbsPasses', 'DBS passes', 1, 8)}</div><div id="grid-controls" class="control-section" hidden>${slider('gridWidth', 'Grid width', 1, 32)}${slider('gridHeight', 'Grid height', 1, 32)}${slider('gridMinimum', 'Minimum ink', 0, 4096)}</div>
               <div class="control-section">${slider('scale', 'Pixel scale', 1, 16, 1, '×')}${slider('strength', 'Dither strength', 0, 150, 1, '%')}${slider('patternSize', 'Pattern size', 2, 32, 1, 'px')}${slider('threshold', 'Threshold', 0, 100, 1, '%')}${slider('jitter', 'Jitter', 0, 100, 1, '%')}<div id="matrix-step-controls" class="control-subsection" hidden>${slider('matrixStep', 'Matrix step', 1, 128)}</div><div id="history-controls" class="control-subsection" hidden>${slider('errorHistory', 'Error history', 4, 64)}</div></div><label id="serpentine-row" class="toggle-row"><input id="serpentine" type="checkbox"> Serpentine scan</label><div id="matrix-rotation-row" class="field-row" hidden><label for="matrix-rotation">Rotate</label><select id="matrix-rotation"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
             </section>
             <section class="panel-section" aria-labelledby="palette-heading"><div class="section-title"><h2 id="palette-heading">Color</h2><span class="count" id="palette-count">2 colors</span></div>
@@ -104,7 +109,7 @@ $('app').innerHTML = `
               <p id="cmyk-note" class="hint" hidden>CMYK uses source colors for four ink screens. Choose another style to use a palette.</p><div id="rgb-controls" hidden>${slider('levels', 'Levels per channel', 2, 16)}</div>
               <div id="palette-controls"><div class="field-row"><label for="palette-select">Palette</label><select id="palette-select">${palettes.map((p, i) => `<option value="${i}">${p.name}</option>`).join('')}<option value="custom">Custom palette</option></select></div>
               <div class="palette-edit"><div id="palette-colors" class="palette-colors"></div><button id="add-color" class="icon-button" aria-label="Add color" title="Add color">${icon('plus')}</button></div>
-              <div class="field-row"><label for="quantizer">Extract</label><select id="quantizer"><option value="median-cut">Median cut · balanced</option><option value="wu">Wu · variance</option><option value="kmeans">K-means · refined</option></select></div><div class="palette-actions"><button id="extract" class="small-link">Extract from image</button><label class="sr-only" for="extract-count">Number of extracted colors</label><select id="extract-count">${[2, 3, 4, 6, 8, 12, 16, 32, 64, 128, 256].map((n) => `<option${n === 6 ? ' selected' : ''}>${n}</option>`).join('')}</select><button id="import-palette" class="small-link">Import</button><button id="export-palette" class="small-link">Save</button></div></div>
+              <div class="field-row"><label for="quantizer">Extract</label><select id="quantizer"><option value="median-cut">Median cut · balanced</option><option value="wu">Wu · variance</option><option value="kmeans">K-means · refined</option><option value="kdtree">KD-tree · unique colors</option></select></div><div class="palette-actions"><button id="extract" class="small-link">Extract from image</button><label class="sr-only" for="extract-count">Number of extracted colors</label><select id="extract-count">${[2, 3, 4, 6, 8, 12, 16, 32, 64, 128, 256].map((n) => `<option${n === 6 ? ' selected' : ''}>${n}</option>`).join('')}</select><button id="import-palette" class="small-link">Import</button><button id="export-palette" class="small-link">Save</button></div></div>
             </section>
             <section class="panel-section" aria-labelledby="tone-heading"><div class="section-title"><h2 id="tone-heading">Adjustments</h2><button id="reset-adjustments" class="small-link">Reset</button></div>
               <div class="control-section">${slider('brightness', 'Brightness', -100, 100)}${slider('contrast', 'Contrast', -100, 100)}${slider('gamma', 'Gamma', 0.2, 3, 0.05)}${slider('saturation', 'Saturation', 0, 200, 1, '%')}</div><label class="toggle-row"><input id="invert" type="checkbox"> Invert source colors</label>
@@ -159,6 +164,7 @@ let batchFiles: File[] = [],
   batchBusy = false,
   batchAbort: AbortController | null = null;
 let exportBusy = false;
+let imageExportAbort: AbortController | null = null;
 const builtinPresets: { name: string; tag: string; settings: Settings }[] = [
   { name: 'The original', tag: 'DIFFUSION', settings: cloneSettings(defaults) },
   {
@@ -366,18 +372,35 @@ function syncControls() {
     settings.serpentine || settings.algorithm.endsWith('-serpentine');
   $<HTMLInputElement>('serpentine').disabled = settings.algorithm.endsWith('-serpentine');
   const group = algorithms.find((a) => a[0] === settings.algorithm)![2];
+  const limits = methodLimits(settings.algorithm);
+  $('dbs-controls').hidden = !settings.algorithm.startsWith('dbs-');
+  $('grid-controls').hidden = !settings.algorithm.startsWith('grid-');
+  $('method-budget').hidden = !limits;
+  $('method-budget').textContent = limits
+    ? `Preview ≤ ${limits.previewSide} px. Export ≤ ${limits.pixels.toLocaleString()} working pixels (after Pixel scale). Motion ≤ ${limits.motionPixels.toLocaleString()} working pixels/frame, ${limits.motionFrames} frames${settings.algorithm.startsWith('dbs-') ? ', ≤12 FPS' : ''}. Bounded work and time; export size is never reduced automatically.`
+    : '';
+
   $('serpentine-row').hidden = !['Diffusion', 'Variable diffusion'].includes(group);
   $('matrix-rotation-row').hidden = group !== 'Ordered';
   $('matrix-step-controls').hidden = !settings.algorithm.startsWith('variable-');
-  $('history-controls').hidden = !settings.algorithm.startsWith('riemersma');
+  $('history-controls').hidden = !(
+    settings.algorithm.startsWith('riemersma') || settings.algorithm.startsWith('curve-')
+  );
   $<HTMLInputElement>('invert').checked = settings.invert;
   $<HTMLInputElement>('seed').value = String(settings.seed);
   $<HTMLSelectElement>('color-mode').value = settings.colorMode;
   const cmyk = settings.algorithm === 'cmyk';
   $('cmyk-note').hidden = !cmyk;
-  $<HTMLSelectElement>('color-mode').disabled = cmyk || group === 'Tiles';
+  $<HTMLSelectElement>('color-mode').disabled =
+    cmyk || group === 'Tiles' || group === 'Optimization' || group === 'Grid';
   $<HTMLSelectElement>('working-space').disabled = cmyk;
-  $<HTMLSelectElement>('color-distance').disabled = cmyk || settings.colorMode === 'rgb';
+  $<HTMLSelectElement>('color-distance').disabled =
+    cmyk ||
+    settings.colorMode === 'rgb' ||
+    group === 'Tiles' ||
+    group === 'Optimization' ||
+    group === 'Grid' ||
+    settings.algorithm === 'auto-threshold';
   $('rgb-controls').hidden = cmyk || settings.colorMode !== 'rgb';
   $('palette-controls').hidden = cmyk || settings.colorMode === 'rgb';
   const pattern = algorithms.find((a) => a[0] === settings.algorithm)?.[2] === 'Pattern';
@@ -385,9 +408,15 @@ function syncControls() {
   $<HTMLInputElement>('patternSize').hidden = !pattern;
   document.querySelector<HTMLLabelElement>('label[for="patternSize"]')!.hidden = !pattern;
   $<HTMLInputElement>('strength').disabled =
-    cmyk || group === 'Tiles' || settings.algorithm === 'threshold';
-  $<HTMLInputElement>('jitter').disabled = cmyk || group === 'Tiles';
-  $<HTMLInputElement>('threshold').disabled = cmyk;
+    cmyk ||
+    group === 'Tiles' ||
+    group === 'Optimization' ||
+    group === 'Grid' ||
+    settings.algorithm === 'threshold' ||
+    settings.algorithm === 'auto-threshold';
+  $<HTMLInputElement>('jitter').disabled =
+    cmyk || group === 'Tiles' || group === 'Optimization' || group === 'Grid';
+  $<HTMLInputElement>('threshold').disabled = cmyk || settings.algorithm === 'auto-threshold';
   for (const id of ['patternSize', 'strength', 'threshold']) {
     document
       .querySelector(`label[for="${id}"]`)
@@ -414,33 +443,18 @@ function sourceAtSize(maxSide: number, ratio = 1): HTMLCanvasElement {
   canvas.getContext('2d')!.drawImage(source, 0, 0, canvas.width, canvas.height);
   return canvas;
 }
-function runWorker(pixels: Pixels, s: Settings, signal?: AbortSignal): Promise<Pixels> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new DOMException('Processing cancelled.', 'AbortError'));
-      return;
-    }
-    const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
-    const cleanup = () => {
-      worker.terminate();
-      signal?.removeEventListener('abort', cancel);
-    };
-    const cancel = () => {
-      cleanup();
-      reject(new DOMException('Processing cancelled.', 'AbortError'));
-    };
-    signal?.addEventListener('abort', cancel, { once: true });
-    worker.onmessage = (event) => {
-      cleanup();
-      if (event.data.error) reject(new Error(event.data.error));
-      else resolve(event.data.result);
-    };
-    worker.onerror = (event) => {
-      cleanup();
-      reject(new Error(event.message || 'The image worker could not start.'));
-    };
-    worker.postMessage({ pixels, settings: s }, [pixels.data.buffer]);
-  });
+async function runWorker(
+  pixels: Pixels,
+  s: Settings,
+  signal?: AbortSignal,
+  intent: 'preview' | 'export' = 'export',
+): Promise<Pixels> {
+  const processor = new FrameProcessor();
+  try {
+    return await processor.process(pixels, s, intent, signal);
+  } finally {
+    processor.dispose();
+  }
 }
 function scheduleRender() {
   if (motion.active) {
@@ -457,11 +471,12 @@ function scheduleRender() {
   updateExportNote();
   $('render-status').textContent = 'Developing pixels…';
   $('render-status').classList.add('rendering');
+  $('cancel-preview').hidden = !methodLimits(settings.algorithm);
   renderTimer = setTimeout(
     () =>
       safely(async () => {
         const started = performance.now(),
-          canvas = sourceAtSize(1100),
+          canvas = sourceAtSize(methodLimits(settings.algorithm)?.previewSide ?? 1100),
           ratio = canvas.width / source.width;
         const previewSettings = cloneSettings(settings);
         // Keep texture frequency close to the full-resolution export at reduced preview size.
@@ -475,14 +490,18 @@ function scheduleRender() {
           canvasPixels(canvas),
           previewSettings,
           previewAbort.signal,
+          'preview',
         ).catch((error) => {
           if (
             version === renderVersion &&
             !(error instanceof DOMException && error.name === 'AbortError')
           ) {
             $('render-status').textContent =
-              'Preview failed. Try a smaller image or reset the settings.';
+              error instanceof Error
+                ? error.message
+                : 'Preview failed. Try a smaller image or reset the settings.';
             $('render-status').classList.remove('rendering');
+            $('cancel-preview').hidden = true;
           }
           throw error;
         });
@@ -504,8 +523,9 @@ function scheduleRender() {
             : sourceName.toUpperCase();
         $('dimensions').textContent = `${source.width} × ${source.height}`;
         $('render-status').textContent =
-          `${algorithms.find((a) => a[0] === settings.algorithm)![1]} · ${Math.round(performance.now() - started)} ms`;
+          `${algorithms.find((a) => a[0] === settings.algorithm)![1]} · ${Math.round(performance.now() - started)} ms${result.notice ? ` · ${result.notice}` : ''}`;
         $('render-status').classList.remove('rendering');
+        $('cancel-preview').hidden = true;
         previewAbort = null;
         updateZoom();
       }),
@@ -590,10 +610,15 @@ function updateExportNote() {
     ? `${w} × ${h} · actual vector paths${w * h > 1_000_000 ? ' · choose a smaller size (1 MP limit)' : ''}`
     : `${w} × ${h} · ${ratio === 1 ? 'full resolution' : 'resized before processing'}`;
 }
-async function getExportPixels() {
-  if (motion.active) return motion.currentFrame();
+async function getExportPixels(signal?: AbortSignal) {
+  if (motion.active) return motion.currentFrame(signal);
   const ratio = +$<HTMLSelectElement>('export-size').value;
-  return runWorker(canvasPixels(sourceAtSize(8192, ratio)), cloneSettings(settings));
+  assertProcessingSize(
+    Math.max(1, Math.round(source.width * ratio)),
+    Math.max(1, Math.round(source.height * ratio)),
+    settings,
+  );
+  return runWorker(canvasPixels(sourceAtSize(8192, ratio)), cloneSettings(settings), signal);
 }
 function exportName(ext: string) {
   return `${sourceName.replace(/\.[^.]+$/, '').replace(/[^a-z0-9-_]/gi, '-') || 'image'}-dither4all.${ext}`;
@@ -611,12 +636,14 @@ async function exportImage(copy = false, frame = false) {
   )
     throw new Error('Choose 50% or 25% output size for SVG (1 megapixel limit).');
   exportBusy = true;
+  imageExportAbort = new AbortController();
+  $('cancel-image-export').hidden = false;
   $<HTMLButtonElement>('export').disabled = true;
   $<HTMLButtonElement>('copy-image').disabled = true;
   $('export').innerHTML = `Developing… <span class="spinner"></span>`;
   try {
     // ClipboardItem accepts a promise, preserving transient user activation on Safari.
-    const blobPromise = getExportPixels().then((p) =>
+    const blobPromise = getExportPixels(imageExportAbort.signal).then((p) =>
       format.startsWith('svg')
         ? new Blob([svgImage(p, format === 'svg-black')], { type: 'image/svg+xml' })
         : rasterBlob(p, format),
@@ -629,11 +656,15 @@ async function exportImage(copy = false, frame = false) {
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
       toast('Image copied to your clipboard.');
     } else {
-      download(await blobPromise, filename);
+      const blob = await blobPromise;
+      imageExportAbort.signal.throwIfAborted();
+      download(blob, filename);
       toast('Your pixels are ready.');
     }
   } finally {
     exportBusy = false;
+    imageExportAbort = null;
+    $('cancel-image-export').hidden = true;
     $<HTMLButtonElement>('export').disabled = false;
     $<HTMLButtonElement>('copy-image').disabled = false;
     $('export').innerHTML =
@@ -685,6 +716,7 @@ const motion = new MotionEditor({
   },
   renderStill: scheduleRender,
   cancelStill: () => {
+    $('cancel-preview').hidden = true;
     clearTimeout(renderTimer);
     ++renderVersion;
     previewAbort?.abort();
@@ -727,7 +759,13 @@ $<HTMLInputElement>('serpentine').onchange = () =>
 $<HTMLSelectElement>('algorithm-select').onchange = () =>
   change((s) => {
     s.algorithm = $<HTMLSelectElement>('algorithm-select').value as AlgorithmId;
-    if (s.algorithm.startsWith('tile-')) s.colorMode = 'palette';
+    if (
+      s.algorithm.startsWith('tile-') ||
+      s.algorithm.startsWith('dbs-') ||
+      s.algorithm.startsWith('grid-') ||
+      s.algorithm === 'auto-threshold'
+    )
+      s.colorMode = 'palette';
   });
 $<HTMLSelectElement>('builtin-preset').onchange = () => {
   const value = $<HTMLSelectElement>('builtin-preset').value;
@@ -936,6 +974,22 @@ bind('add-effect', () => {
   );
   renderEffects();
 });
+bind('cancel-image-export', () => {
+  imageExportAbort?.abort();
+  toast('Export cancelled.');
+});
+bind('cancel-preview', () => {
+  if (motion.active) {
+    motion.cancelPreview();
+    return;
+  }
+  clearTimeout(renderTimer);
+  ++renderVersion;
+  previewAbort?.abort();
+  $('render-status').textContent = 'Preview cancelled. Change a setting to render again.';
+  $('render-status').classList.remove('rendering');
+  $('cancel-preview').hidden = true;
+});
 bind('export', () => exportImage());
 bind('copy-image', () => exportImage(true));
 $('format').onchange = updateExportNote;
@@ -1115,6 +1169,7 @@ bind('batch-run', async () => {
       $('batch-status').textContent = `Processing ${i + 1} / ${files.length}: ${file.name}`;
       const canvas = await decodeImage(file);
       if (batchCancelled) return;
+      assertProcessingSize(canvas.width, canvas.height, recipe);
       const result = await runWorker(canvasPixels(canvas), recipe, batchAbort.signal);
       if (batchCancelled) return;
       const blob = await rasterBlob(result, 'png');

@@ -1,3 +1,4 @@
+import { assertMotionBudget, methodLimits } from '../engine/limits';
 import { canvasPixels, rasterBlob, zipFiles } from '../files';
 import { type Settings } from '../engine/catalog';
 import { FrameProcessor } from './processor';
@@ -118,6 +119,11 @@ export async function exportMotion(o: MotionExport): Promise<Blob> {
   );
   if (count > 900)
     throw new Error('Export is limited to 900 frames. Reduce the duration or frame rate.');
+  const minimumScale = Math.min(
+    o.settings.scale,
+    ...t.keys.filter((k) => k.channel === 'scale').map((k) => k.value),
+  );
+  assertMotionBudget(dims.width, dims.height, { ...o.settings, scale: minimumScale }, count, t.fps);
   const m = await import('mediabunny');
   const codec = o.format === 'mp4' ? 'avc' : 'vp8',
     audioCodec = o.format === 'mp4' ? 'aac' : 'opus';
@@ -132,6 +138,23 @@ export async function exportMotion(o: MotionExport): Promise<Blob> {
   let output: InstanceType<typeof m.Output> | null = null;
   let iterator:
     AsyncGenerator<import('mediabunny').WrappedCanvas | null, void, unknown> | undefined;
+  const originalSignal = o.signal,
+    controller = new AbortController();
+  const forwardAbort = () => controller.abort(originalSignal.reason);
+  if (originalSignal.aborted) forwardAbort();
+  else originalSignal.addEventListener('abort', forwardAbort, { once: true });
+  const deadline = methodLimits(o.settings.algorithm)
+    ? setTimeout(
+        () =>
+          controller.abort(
+            new Error(
+              'Motion export exceeded its 90-second budget. Reduce duration or resolution.',
+            ),
+          ),
+        90000,
+      )
+    : undefined;
+  o = { ...o, signal: controller.signal };
   const abort = () => {
     processor?.dispose();
     gif?.terminate();
@@ -303,7 +326,12 @@ export async function exportMotion(o: MotionExport): Promise<Blob> {
       ),
     });
     return zipFiles(files);
+  } catch (error) {
+    if (o.signal.aborted && !originalSignal.aborted) throw o.signal.reason;
+    throw error;
   } finally {
+    clearTimeout(deadline);
+    originalSignal.removeEventListener('abort', forwardAbort);
     o.signal.removeEventListener('abort', abort);
     processor?.dispose();
     gif?.terminate();
