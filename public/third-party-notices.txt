@@ -1,0 +1,17 @@
+Dither4All application code is MIT licensed.
+
+Runtime media libraries:
+
+Mediabunny 1.61.5, Copyright (c) Vanilagy and contributors.
+License: Mozilla Public License 2.0, ./licenses/mediabunny-MPL-2.0.txt
+Unmodified corresponding source (including the exact version):
+https://www.npmjs.com/package/mediabunny/v/1.61.5
+https://github.com/Vanilagy/mediabunny/tree/v1.61.5
+Mediabunny is loaded locally from this app's build when opening/exporting video.
+Its source files retain the MPL; this does not change the license of Dither4All's own files.
+
+gifenc 1.0.3, Copyright (c) 2021 Matt DesLauriers.
+License: MIT, ./licenses/gifenc-MIT.txt
+Source: https://www.npmjs.com/package/gifenc/v/1.0.3
+https://github.com/mattdesl/gifenc
+Loaded in a local worker for GIF export.
