@@ -234,7 +234,13 @@ export async function exportMotion(o: MotionExport): Promise<Blob> {
               pixels: result.data,
               width: dims.width,
               height: dims.height,
-              delay: gifDelay(i, t.fps),
+              delay:
+                i === count - 1
+                  ? Math.max(
+                      10,
+                      Math.round((t.end - t.start) * 100) * 10 - Math.round((i * 100) / t.fps) * 10,
+                    )
+                  : gifDelay(i, t.fps),
               loop: t.loop,
               last: i === count - 1,
               reset: i === 0,

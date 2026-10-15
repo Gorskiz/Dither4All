@@ -1,3 +1,5 @@
+import { validateTimeline } from './motion/model';
+import type { MotionProject } from './motion/editor';
 import { validateSettings, type Settings } from './engine/catalog';
 import type { Pixels } from './engine/process';
 import { luminance } from './engine/color';
@@ -109,6 +111,7 @@ export interface Project {
   name: string;
   settings: Settings;
   image: string;
+  motion?: MotionProject;
 }
 export function readProject(text: string): Project {
   let p: unknown;
@@ -126,6 +129,20 @@ export function readProject(text: string): Project {
     typeof project.name !== 'string'
   )
     throw new Error('Unsupported project format.');
+  if (project.motion) {
+    const motion = project.motion;
+    motion.timeline = validateTimeline(motion.timeline, motion.duration);
+    if (
+      motion.video &&
+      (typeof motion.video.name !== 'string' ||
+        motion.video.name.length > 255 ||
+        !Number.isFinite(motion.video.size) ||
+        motion.video.size < 0 ||
+        motion.video.size > 500_000_000 ||
+        !Number.isFinite(motion.video.lastModified))
+    )
+      throw new Error('Invalid video reference.');
+  }
   return {
     ...project,
     name: project.name.slice(0, 160),

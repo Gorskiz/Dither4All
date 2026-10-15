@@ -24,6 +24,7 @@ import {
   zipFiles,
 } from './files';
 import { makeSample } from './sample';
+import { MotionEditor } from './motion/editor';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const escape = (s: string) =>
@@ -57,24 +58,24 @@ const slider = (id: string, label: string, min: number, max: number, step = 1, s
 
 $('app').innerHTML = `
   <header class="site-header">
-    <a class="brand" href="./" aria-label="Dither4All home"><span class="brand-mark">D4</span><span>Dither4All</span></a>
+    <a class="brand" href="./"><span class="brand-mark" aria-hidden="true">D4</span><span>Dither4All</span></a>
     <nav class="document-actions" aria-label="Document actions"><button id="open-project">Open project</button><button id="save-project">Save project</button><button id="batch-open">Batch</button></nav>
     <nav class="header-links" aria-label="Help and application"><button id="help-open">Guide</button><button id="about-open">About</button><a href="https://github.com/Gorskiz/Dither4All" aria-label="Dither4All on GitHub" target="_blank" rel="noopener noreferrer">${icon('github')}</a><button id="fullscreen" class="icon-button" aria-label="Toggle fullscreen">${icon('expand')}</button></nav>
   </header>
   <main>
-    <h1 class="sr-only">Dither4All image editor</h1>
+    <h1 class="sr-only">Dither4All image and motion editor</h1>
     <section class="studio" aria-label="Image editor">
       <div class="editor-layout">
         <section class="preview-panel" aria-label="Image preview">
           <div class="document-bar"><span class="document-indicator"></span><span id="image-name">Orbital study — sample image</span><span class="document-kind">IMAGE</span></div>
           <div class="preview-toolbar"><div class="view-modes" aria-label="Preview mode"><button data-view="output" aria-pressed="true">Dithered</button><button data-view="split" aria-pressed="false">Compare</button><button data-view="original" aria-pressed="false">Original</button></div><div class="history-buttons"><button id="undo" class="icon-button" aria-label="Undo settings" title="Undo (Ctrl/⌘ Z)">${icon('undo')}</button><button id="redo" class="icon-button" aria-label="Redo settings" title="Redo (Ctrl/⌘ Shift Z)">${icon('redo')}</button><button id="reset" class="icon-button" aria-label="Reset settings" title="Reset all settings">↺</button></div></div>
-          <div id="drop-zone" class="canvas-stage"><div class="drop-hint">Drop an image to open</div><div id="canvas-frame" class="canvas-frame"><canvas id="original-canvas" aria-label="Original image"></canvas><canvas id="output-canvas" aria-label="Dithered image"></canvas><div id="split-line" class="split-line" hidden><span>↔</span></div><span id="image-badge" class="sr-only">Dithered preview</span></div></div>
+          <div id="drop-zone" class="canvas-stage"><div class="drop-hint">Drop an image or video to open</div><div id="canvas-frame" class="canvas-frame"><canvas id="original-canvas" aria-label="Original image"></canvas><canvas id="output-canvas" aria-label="Dithered image"></canvas><div id="split-line" class="split-line" hidden><span>↔</span></div><span id="image-badge" class="sr-only">Dithered preview</span></div></div>
           <div id="compare-control" class="compare-control" hidden><label for="compare">Original / dithered split</label><input id="compare" type="range" min="0" max="100" value="50"></div>
           <div class="canvas-bottom"><span id="dimensions">1200 × 900</span><button id="sample" class="small-link">Use sample</button><label class="zoom-label" for="zoom">Zoom <select id="zoom"><option value="fit">Fit</option><option value="50">50%</option><option value="100">100%</option><option value="200">200%</option></select></label></div>
           <div class="preview-status"><span id="render-status" role="status" aria-live="polite">Preparing preview…</span><span>${icon('shield')} Local processing</span></div>
         </section>
         <aside class="inspector" aria-label="Image controls">
-          <div class="inspector-actions"><button id="upload" class="outline-button">${icon('upload')} Open image</button><button id="export" class="export-button">Export image ${icon('download')}</button></div>
+          <div class="inspector-actions"><button id="upload" class="outline-button">${icon('upload')} Open media</button><button id="export" class="export-button">Export image ${icon('download')}</button></div>
           <div class="inspector-body">
             <section class="panel-section" aria-labelledby="dither-heading"><div class="section-title"><h2 id="dither-heading">Dithering</h2><span class="count">32 styles</span></div>
               <div class="field-row"><label for="algorithm-select">Style</label><select id="algorithm-select">${[
@@ -131,9 +132,9 @@ $('app').innerHTML = `
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <dialog id="batch-dialog" aria-labelledby="batch-dialog-title"><form method="dialog" class="dialog-header"><div><p class="eyebrow">A WHOLE LOT OF PIXELS</p><h2 id="batch-dialog-title">Batch your images.</h2></div><button class="icon-button" aria-label="Close batch">${icon('close')}</button></form><p>Apply the current settings to up to 20 images. Download one ZIP of PNGs. Each image keeps its own dimensions.</p><label class="batch-drop" for="batch-input">${icon('upload')} Choose images<input id="batch-input" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/bmp" multiple></label><ul id="batch-list" class="batch-list"></ul><p id="batch-status" role="status" aria-live="polite">Nothing selected yet.</p><button id="batch-run" class="export-button" disabled>Process & download ZIP ${icon('download')}</button><button id="batch-cancel" class="small-link" hidden>Cancel batch</button></dialog>
-  <dialog id="help-dialog" aria-labelledby="help-dialog-title"><form method="dialog" class="dialog-header"><div><p class="eyebrow">THE FIELD GUIDE</p><h2 id="help-dialog-title">Embrace the limitations.</h2></div><button class="icon-button" aria-label="Close guide">${icon('close')}</button></form><div class="guide-grid"><article><span>01</span><h3>Bring an image.</h3><p>Drop a PNG, JPG, WebP, AVIF, BMP, or GIF into the canvas. Paste from your clipboard, or start with our original sample. Animated files use their first frame.</p></article><article><span>02</span><h3>Find your texture.</h3><p>Diffusion gives organic grain. Ordered dithering gives a grid. Patterns give lines, dots, and halftones. Pixel scale changes texture size while preserving output dimensions.</p></article><article><span>03</span><h3>Pick your ink.</h3><p>Choose a palette, edit each swatch, or extract colors from your image. Full color mode quantizes RGB channels. CMYK uses source colors for a four-screen ink simulation.</p></article><article><span>04</span><h3>Break it beautifully.</h3><p>Add, toggle, and reorder effects. Save your settings as presets, share a settings link, or save a project with its image. Export raster images or actual SVG paths.</p></article></div><p class="guide-note">Keyboard: O opens an image; Ctrl/⌘ Z undoes; Ctrl/⌘ Shift Z redoes. Preview is reduced to 1100 px; export processes the selected full size. Images: up to 16 MP, 8192 px per side, 50 MB. SVG: up to 1 MP. Batch: 20 files, 100 MB combined.</p></dialog>
-  <dialog id="about-dialog" aria-labelledby="about-dialog-title"><form method="dialog" class="dialog-header"><h2 id="about-dialog-title">Pixels for the people.</h2><button class="icon-button" aria-label="Close about">${icon('close')}</button></form><p>Dither4All is a free, MIT-licensed image editor. Your images are decoded and processed on your device. The app has no image upload endpoint, analytics, cookies, account system, or remote fonts. Presets are saved in your browser when you choose to save them.</p><p>The host receives normal web requests to load the app. Settings links contain settings only. Project files contain the image and should be shared intentionally. Clipboard access is requested only when you copy an image.</p><p>Built independently from documented dithering techniques. Custom effects are original implementations, not replicas of proprietary modules. No video or animation processing in this release.</p><a href="https://github.com/Gorskiz/Dither4All" target="_blank" rel="noopener noreferrer">Read the source, report a bug, make it better ↗</a></dialog>
-  <input hidden id="image-input" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/bmp">
+  <dialog id="help-dialog" aria-labelledby="help-dialog-title"><form method="dialog" class="dialog-header"><div><p class="eyebrow">THE FIELD GUIDE</p><h2 id="help-dialog-title">Embrace the limitations.</h2></div><button class="icon-button" aria-label="Close guide">${icon('close')}</button></form><div class="guide-grid"><article><span>01</span><h3>Bring an image.</h3><p>Drop a PNG, JPG, WebP, AVIF, BMP, or GIF into the canvas. Paste from your clipboard, or start with our original sample. Animated image imports use their first frame. Open MP4, WebM or MOV to process video; choose Animate image for stills. Use Space to play, scrub the timeline, set trim points, and add adjustment keyframes. Export MP4, WebM, GIF, or a ZIP of PNG frames. Video projects store a poster and timeline; reopen the original video to relink.</p></article><article><span>02</span><h3>Find your texture.</h3><p>Diffusion gives organic grain. Ordered dithering gives a grid. Patterns give lines, dots, and halftones. Pixel scale changes texture size while preserving output dimensions.</p></article><article><span>03</span><h3>Pick your ink.</h3><p>Choose a palette, edit each swatch, or extract colors from your image. Full color mode quantizes RGB channels. CMYK uses source colors for a four-screen ink simulation.</p></article><article><span>04</span><h3>Break it beautifully.</h3><p>Add, toggle, and reorder effects. Save your settings as presets, share a settings link, or save a project with its image. Export raster images or actual SVG paths.</p></article></div><p class="guide-note">Keyboard: O opens an image; Ctrl/⌘ Z undoes; Ctrl/⌘ Shift Z redoes. Preview is reduced to 1100 px; export processes the selected full size. Images: up to 16 MP, 8192 px per side, 50 MB. SVG: up to 1 MP. Batch: 20 files, 100 MB combined.</p></dialog>
+  <dialog id="about-dialog" aria-labelledby="about-dialog-title"><form method="dialog" class="dialog-header"><h2 id="about-dialog-title">Pixels for the people.</h2><button class="icon-button" aria-label="Close about">${icon('close')}</button></form><p>Dither4All is a free, MIT-licensed image editor. Your images are decoded and processed on your device. The app has no image upload endpoint, analytics, cookies, account system, or remote fonts. Presets are saved in your browser when you choose to save them.</p><p>The host receives normal web requests to load the app. Settings links contain settings only. Project files contain the image and should be shared intentionally. Clipboard access is requested only when you copy an image.</p><p>Built independently from documented dithering techniques. Custom effects are original implementations, not replicas of proprietary modules. Video and still animation use the same local effects engine. MP4/WebM encoding depends on browser codecs. <a href="./third-party-notices.txt" target="_blank">Media libraries and licenses</a>.</p><a href="https://github.com/Gorskiz/Dither4All" target="_blank" rel="noopener noreferrer">Read the source, report a bug, make it better ↗</a></dialog>
+  <input hidden id="image-input" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/bmp,video/mp4,video/webm,video/quicktime,video/x-matroska,.mkv,.mov">
   <input hidden id="project-input" type="file" accept=".d4a,application/json">
   <input hidden id="palette-input" type="file" accept=".json,.txt,.hex,.gpl">
   <input hidden id="preset-input" type="file" accept=".json">
@@ -416,6 +417,13 @@ function runWorker(pixels: Pixels, s: Settings, signal?: AbortSignal): Promise<P
   });
 }
 function scheduleRender() {
+  if (motion.active) {
+    clearTimeout(renderTimer);
+    ++renderVersion;
+    previewAbort?.abort();
+    motion.refresh();
+    return;
+  }
   clearTimeout(renderTimer);
   const version = ++renderVersion;
   previewAbort?.abort();
@@ -479,9 +487,22 @@ function scheduleRender() {
   );
 }
 async function loadImage(file: Blob, name: string) {
+  motion.assertIdle();
+  if (
+    file instanceof File &&
+    (file.type.startsWith('video/') || /\.(mp4|webm|mov|mkv|m4v)$/i.test(name))
+  ) {
+    ++importVersion;
+    clearTimeout(renderTimer);
+    ++renderVersion;
+    previewAbort?.abort();
+    await motion.open(file);
+    return;
+  }
   const version = ++importVersion,
     canvas = await decodeImage(file);
   if (version !== importVersion) return;
+  motion.reset();
   source = canvas;
   sourceName = name;
   history = [cloneSettings(settings)];
@@ -531,6 +552,10 @@ function updateZoom() {
   $('canvas-frame').style.width = `${width}px`;
 }
 function updateExportNote() {
+  if (motion.active) {
+    $('export-note').textContent = 'Current-frame export uses the motion Longest side setting.';
+    return;
+  }
   const ratio = +$<HTMLSelectElement>('export-size').value,
     w = Math.max(1, Math.round(source.width * ratio)),
     h = Math.max(1, Math.round(source.height * ratio));
@@ -540,13 +565,16 @@ function updateExportNote() {
     : `${w} × ${h} · ${ratio === 1 ? 'full resolution' : 'resized before processing'}`;
 }
 async function getExportPixels() {
+  if (motion.active) return motion.currentFrame();
   const ratio = +$<HTMLSelectElement>('export-size').value;
   return runWorker(canvasPixels(sourceAtSize(8192, ratio)), cloneSettings(settings));
 }
 function exportName(ext: string) {
   return `${sourceName.replace(/\.[^.]+$/, '').replace(/[^a-z0-9-_]/gi, '-') || 'image'}-dither4all.${ext}`;
 }
-async function exportImage(copy = false) {
+async function exportImage(copy = false, frame = false) {
+  if (motion.active && !copy && !frame) return motion.export();
+  if (motion.busy) return;
   if (exportBusy) return;
   const format = copy ? 'png' : $<HTMLSelectElement>('format').value;
   const filename = exportName(format.startsWith('svg') ? 'svg' : format);
@@ -582,7 +610,8 @@ async function exportImage(copy = false) {
     exportBusy = false;
     $<HTMLButtonElement>('export').disabled = false;
     $<HTMLButtonElement>('copy-image').disabled = false;
-    $('export').innerHTML = `Export image ${icon('download')}`;
+    $('export').innerHTML =
+      `${motion.active ? 'Export animation' : 'Export image'} ${icon('download')}`;
   }
 }
 function savedPresets(): { name: string; settings: Settings }[] {
@@ -620,6 +649,20 @@ function storePresets(presets: ReturnType<typeof savedPresets>) {
 function openDialog(id: string) {
   $<HTMLDialogElement>(id).showModal();
 }
+const motion = new MotionEditor({
+  settings: () => settings,
+  source: () => source,
+  setSource: (canvas, name) => {
+    source = canvas;
+    sourceName = name;
+    $('image-name').textContent = name;
+  },
+  renderStill: scheduleRender,
+  zoom: updateZoom,
+  toast,
+  error: fail,
+});
+bind('export-frame', () => exportImage(false, true));
 for (const id of ['help', 'about']) bind(`${id}-open`, () => openDialog(`${id}-dialog`));
 document.querySelectorAll<HTMLDialogElement>('dialog').forEach((dialog) =>
   dialog.addEventListener('click', (e) => {
@@ -731,6 +774,8 @@ $<HTMLInputElement>('image-input').onchange = (e) =>
     input.value = '';
   });
 bind('sample', () => {
+  motion.assertIdle();
+  motion.reset();
   ++importVersion;
   source = makeSample();
   sourceName = 'Orbital study';
@@ -863,6 +908,7 @@ bind('share', async () => {
   toast('Settings link copied. The image is not included.');
 });
 bind('save-project', async () => {
+  const animation = motion.project();
   const recipe = cloneSettings(settings),
     name = sourceName,
     filename = exportName('d4a'),
@@ -874,9 +920,20 @@ bind('save-project', async () => {
   const reader = new FileReader();
   reader.onload = () =>
     download(
-      new Blob([JSON.stringify({ version: 1, name, settings: recipe, image: reader.result })], {
-        type: 'application/json',
-      }),
+      new Blob(
+        [
+          JSON.stringify({
+            version: 1,
+            name,
+            settings: recipe,
+            image: reader.result,
+            ...(animation ? { motion: animation } : {}),
+          }),
+        ],
+        {
+          type: 'application/json',
+        },
+      ),
       filename,
     );
   reader.onerror = () => fail(new Error('Could not save the project file.'));
@@ -888,6 +945,7 @@ $<HTMLInputElement>('project-input').onchange = (e) =>
     const input = e.target as HTMLInputElement,
       file = input.files?.[0];
     if (!file) return;
+    motion.assertIdle();
     if (file.size > MAX_FILE_BYTES + 100000) throw new Error('Project files must be under 50 MB.');
     const project = readProject(await file.text()),
       version = ++importVersion;
@@ -897,6 +955,7 @@ $<HTMLInputElement>('project-input').onchange = (e) =>
       new Blob([bytes], { type: project.image.slice(5, project.image.indexOf(';')) }),
     );
     if (version !== importVersion) return;
+    motion.reset();
     source = canvas;
     sourceName = project.name;
     settings = project.settings;
@@ -907,7 +966,8 @@ $<HTMLInputElement>('project-input').onchange = (e) =>
     renderEffects();
     scheduleRender();
     input.value = '';
-    toast('Project opened.');
+    if (project.motion) motion.restore(project.motion);
+    else toast('Project opened.');
   });
 bind('fullscreen', async () => {
   if (document.fullscreenElement) await document.exitFullscreen();
