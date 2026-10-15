@@ -238,6 +238,7 @@ export class MotionEditor {
         file.size === this.pendingVideo.size;
       if (this.pendingVideo && !restore)
         throw new Error(`Relink the original file: ${this.pendingVideo.name}`);
+      this.assertIdle();
       const saved = restore ? structuredClone(this.t) : null;
       this.reset();
       this.video = candidate;

@@ -134,7 +134,7 @@ test('video import, trim, keyframe project relink, and audio-preserving MP4/WebM
   await page.locator('#image-input').setInputFiles(file);
   await expect(page.locator('#relink-note')).toBeHidden();
   await expect(page.getByLabel('In (s)', { exact: true })).toHaveValue('0.5');
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 320, height: 844 });
   await page.screenshot({ path: 'test-results/motion-mobile.png', fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(errors).toEqual([]);

@@ -58,7 +58,7 @@ const slider = (id: string, label: string, min: number, max: number, step = 1, s
 
 $('app').innerHTML = `
   <header class="site-header">
-    <a class="brand" href="./"><span class="brand-mark" aria-hidden="true">D4</span><span>Dither4All</span></a>
+    <a class="brand" href="./"><span class="brand-mark">D4</span><span>Dither4All</span></a>
     <nav class="document-actions" aria-label="Document actions"><button id="open-project">Open project</button><button id="save-project">Save project</button><button id="batch-open">Batch</button></nav>
     <nav class="header-links" aria-label="Help and application"><button id="help-open">Guide</button><button id="about-open">About</button><a href="https://github.com/Gorskiz/Dither4All" aria-label="Dither4All on GitHub" target="_blank" rel="noopener noreferrer">${icon('github')}</a><button id="fullscreen" class="icon-button" aria-label="Toggle fullscreen">${icon('expand')}</button></nav>
   </header>
