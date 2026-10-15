@@ -11,12 +11,11 @@ import {
   type EffectId,
 } from './engine/catalog';
 import { extractPalette } from './engine/color';
-import { processImage, type Pixels } from './engine/process';
+import type { Pixels } from './engine/process';
 import {
   canvasPixels,
   decodeImage,
   download,
-  imageCanvas,
   MAX_FILE_BYTES,
   parsePalette,
   rasterBlob,
@@ -54,68 +53,83 @@ const icon = (name: string) =>
   }</svg>`;
 
 const slider = (id: string, label: string, min: number, max: number, step = 1, suffix = '') =>
-  `<label class="slider-label" for="${id}"><span>${label}</span><output id="${id}-value"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" data-setting="${id}" data-suffix="${suffix}">`;
+  `<label class="slider-label" for="${id}"><span>${label}</span><output id="${id}-value" aria-hidden="true"></output></label><input type="range" id="${id}" aria-label="${label}" min="${min}" max="${max}" step="${step}" data-setting="${id}" data-suffix="${suffix}">`;
 
 $('app').innerHTML = `
   <header class="site-header">
-    <a class="brand" href="./" aria-label="Dither4All home"><span class="brand-mark" aria-hidden="true">D<span>4</span></span><span>DITHER<span class="brand-four">4</span>ALL<span class="brand-sub">FREE ONLINE DITHER</span></span></a>
-    <nav class="header-links" aria-label="Main navigation"><button id="help-open" class="text-button">Guide</button><button id="about-open" class="text-button">About & privacy</button><a href="https://github.com/Gorskiz/Dither4All" aria-label="Dither4All on GitHub" target="_blank" rel="noopener noreferrer">${icon('github')} <span>Open source</span> ↗</a></nav>
+    <a class="brand" href="./" aria-label="Dither4All home"><span class="brand-mark">D4</span><span>Dither4All</span></a>
+    <nav class="document-actions" aria-label="Document actions"><button id="open-project">Open project</button><button id="save-project">Save project</button><button id="batch-open">Batch</button></nav>
+    <nav class="header-links" aria-label="Help and application"><button id="help-open">Guide</button><button id="about-open">About</button><a href="https://github.com/Gorskiz/Dither4All" aria-label="Dither4All on GitHub" target="_blank" rel="noopener noreferrer">${icon('github')}</a><button id="fullscreen" class="icon-button" aria-label="Toggle fullscreen">${icon('expand')}</button></nav>
   </header>
   <main>
     <h1 class="sr-only">Dither4All image editor</h1>
-    <section class="studio" aria-label="Image editor" data-workspace="image">
-      <div class="studio-menu"><div class="menu-start"><span class="workspace-dot"></span><span class="mono">THE WORKSHOP</span><span class="version">v0.1</span></div><div class="project-actions"><button id="open-project">Open project</button><button id="save-project">Save project</button><button id="batch-open">Batch images</button><button id="fullscreen" class="icon-button" aria-label="Toggle fullscreen">${icon('expand')}</button></div></div>
-      <nav class="workspace-tabs" aria-label="Editor workspace"><button data-workspace="image" aria-pressed="true">Image</button><button data-workspace="controls" aria-pressed="false">Dither & color</button><button data-workspace="output" aria-pressed="false">Effects & export</button></nav>
+    <section class="studio" aria-label="Image editor">
       <div class="editor-layout">
-        <aside class="controls-panel" aria-label="Image controls">
-          <div class="panel-heading"><span>MAKE IT YOURS</span><span class="panel-index">01—03</span></div>
-          <div class="tabs" role="tablist" aria-label="Controls"><button role="tab" aria-selected="true" aria-controls="tab-dither" id="dither-tab" data-tab="dither">Dither</button><button role="tab" aria-selected="false" aria-controls="tab-adjust" id="adjust-tab" data-tab="adjust" tabindex="-1">Adjust</button><button role="tab" aria-selected="false" aria-controls="tab-palette" id="palette-tab" data-tab="palette" tabindex="-1">Palette</button></div>
-          <div class="tab-content" id="tab-dither" role="tabpanel" aria-labelledby="dither-tab">
-            <div class="section-title"><h2>Find your texture</h2><span class="count">32</span></div><p class="hint">A little structure. A little chaos.</p>
-            <label class="sr-only" for="algorithm-search">Search algorithms</label><input id="algorithm-search" type="search" placeholder="Search algorithms…" class="search-input">
-            <div class="family-filters" aria-label="Algorithm family">${['All', 'Diffusion', 'Ordered', 'Pattern', 'Other'].map((f, i) => `<button data-family="${f}" aria-pressed="${i === 0}">${f}</button>`).join('')}</div>
-            <div id="algorithm-list" class="algorithm-list" aria-label="Dithering algorithms"></div>
-            <div class="control-section">${slider('scale', 'Pixel scale', 1, 16, 1, '×')}${slider('strength', 'Dither strength', 0, 150, 1, '%')}${slider('patternSize', 'Pattern size', 2, 32, 1, 'px')}${slider('threshold', 'Threshold', 0, 100, 1, '%')}</div>
-            <div class="seed-row"><label for="seed">Noise seed</label><input type="number" id="seed" min="0" max="999999" value="42"><button id="random-seed" class="icon-button" aria-label="Randomize noise seed">${icon('shuffle')}</button></div>
-          </div>
-          <div class="tab-content" id="tab-adjust" role="tabpanel" aria-labelledby="adjust-tab" hidden>
-            <div class="section-title"><h2>Set the tone</h2><button id="reset-adjustments" class="small-link">Reset</button></div><p class="hint">Fine-tune the image before dithering.</p>
-            <div class="control-section">${slider('brightness', 'Brightness', -100, 100)}${slider('contrast', 'Contrast', -100, 100)}${slider('gamma', 'Gamma', 0.2, 3, 0.05)}${slider('saturation', 'Saturation', 0, 200, 1, '%')}</div>
-            <label class="toggle-row"><span>Invert source colors</span><input id="invert" type="checkbox" role="switch"></label>
-            <div class="tip"><span>↳ A GOOD PLACE TO START</span><p>Lift contrast for bold shapes. Lower pixel scale to keep the fine detail.</p></div>
-          </div>
-          <div class="tab-content" id="tab-palette" role="tabpanel" aria-labelledby="palette-tab" hidden>
-            <div class="section-title"><h2>Pick your ink</h2><span class="count" id="palette-count">2</span></div><p class="hint">Small palettes. Big personalities.</p>
-            <label class="field-label" for="color-mode">Color mode</label><select id="color-mode"><option value="palette">Custom palette</option><option value="rgb">Full color · RGB quantization</option></select>
-            <p id="cmyk-note" class="tip" hidden>CMYK uses source colors for four ink screens. Choose another texture to use a custom palette.</p><div id="rgb-controls" hidden>${slider('levels', 'Levels per channel', 2, 16)}</div>
-            <div id="palette-controls"><label class="field-label" for="palette-select">Palette library</label><select id="palette-select">${palettes.map((p, i) => `<option value="${i}">${p.name}</option>`).join('')}<option value="custom">Custom palette</option></select>
-            <div id="palette-colors" class="palette-colors"></div><button id="add-color" class="outline-button full-width">${icon('plus')} Add color</button>
-            <div class="extract-row"><label for="extract-count">Extract colors</label><select id="extract-count">${[2, 3, 4, 6, 8, 12, 16].map((n) => `<option${n === 6 ? ' selected' : ''}>${n}</option>`).join('')}</select></div><button id="extract" class="outline-button full-width">↳ Extract from image</button>
-            <div class="two-buttons"><button id="import-palette">Import palette</button><button id="export-palette">Export palette</button></div></div>
-          </div>
-          <div class="panel-bottom">${icon('shield')} Your images never leave this device.</div>
-        </aside>
         <section class="preview-panel" aria-label="Image preview">
-          <div class="preview-toolbar"><div class="view-modes" aria-label="Preview mode"><button data-view="output" aria-pressed="true">Dithered</button><button data-view="split" aria-pressed="false">Compare</button><button data-view="original" aria-pressed="false">Original</button></div><div class="history-buttons"><button id="undo" class="icon-button" aria-label="Undo settings" title="Undo (Ctrl/⌘ Z)">${icon('undo')}</button><button id="redo" class="icon-button" aria-label="Redo settings" title="Redo (Ctrl/⌘ Shift Z)">${icon('redo')}</button></div></div>
-          <div id="drop-zone" class="canvas-stage"><div class="drop-hint">DROP SOMETHING GOOD.</div><div id="canvas-frame" class="canvas-frame"><canvas id="original-canvas" aria-label="Original image"></canvas><canvas id="output-canvas" aria-label="Dithered image"></canvas><div id="split-line" class="split-line" hidden><span>↔</span></div><span id="image-badge" class="image-badge">DITHERED / LIVE PREVIEW</span></div><div class="artwork-caption"><span id="image-name">ORBITAL STUDY — SAMPLE IMAGE</span><span id="dimensions">1200 × 900</span></div></div>
+          <div class="document-bar"><span class="document-indicator"></span><span id="image-name">Orbital study — sample image</span><span class="document-kind">IMAGE</span></div>
+          <div class="preview-toolbar"><div class="view-modes" aria-label="Preview mode"><button data-view="output" aria-pressed="true">Dithered</button><button data-view="split" aria-pressed="false">Compare</button><button data-view="original" aria-pressed="false">Original</button></div><div class="history-buttons"><button id="undo" class="icon-button" aria-label="Undo settings" title="Undo (Ctrl/⌘ Z)">${icon('undo')}</button><button id="redo" class="icon-button" aria-label="Redo settings" title="Redo (Ctrl/⌘ Shift Z)">${icon('redo')}</button><button id="reset" class="icon-button" aria-label="Reset settings" title="Reset all settings">↺</button></div></div>
+          <div id="drop-zone" class="canvas-stage"><div class="drop-hint">Drop an image to open</div><div id="canvas-frame" class="canvas-frame"><canvas id="original-canvas" aria-label="Original image"></canvas><canvas id="output-canvas" aria-label="Dithered image"></canvas><div id="split-line" class="split-line" hidden><span>↔</span></div><span id="image-badge" class="sr-only">Dithered preview</span></div></div>
           <div id="compare-control" class="compare-control" hidden><label for="compare">Original / dithered split</label><input id="compare" type="range" min="0" max="100" value="50"></div>
-          <div class="canvas-bottom"><button id="upload" class="upload-button">${icon('upload')} Open image <kbd>O</kbd></button><button id="sample" class="small-link">Use sample</button><label class="zoom-label" for="zoom">Zoom <select id="zoom"><option value="fit">Fit</option><option value="50">50%</option><option value="100">100%</option><option value="200">200%</option></select></label></div>
-          <div class="preview-status"><span id="render-status" role="status" aria-live="polite">Preparing your pixels…</span><span>LOCAL PROCESSING <span class="live-dot"></span></span></div>
+          <div class="canvas-bottom"><span id="dimensions">1200 × 900</span><button id="sample" class="small-link">Use sample</button><label class="zoom-label" for="zoom">Zoom <select id="zoom"><option value="fit">Fit</option><option value="50">50%</option><option value="100">100%</option><option value="200">200%</option></select></label></div>
+          <div class="preview-status"><span id="render-status" role="status" aria-live="polite">Preparing preview…</span><span>${icon('shield')} Local processing</span></div>
         </section>
-        <aside class="output-panel" aria-label="Effects and export">
-          <div class="panel-heading"><span>THE FINISHING TOUCH</span><span>✳</span></div>
-          <div class="effects-section"><div class="section-title"><h2>Effects stack</h2><span class="count" id="effect-count">0 / 12</span></div><p class="hint">Layer it up. Order changes everything.</p><div id="effect-stack"></div><button id="add-effect" class="outline-button full-width">${icon('plus')} Add an effect</button></div>
-          <div class="export-section"><div class="section-title"><h2>Make it a file</h2><span>↙</span></div><label class="field-label" for="format">Export format</label><select id="format"><option value="png">PNG · lossless</option><option value="jpg">JPG · smaller file</option><option value="webp">WebP · modern & light</option><option value="svg">SVG · color vectors</option><option value="svg-black">SVG · black ink only</option></select><label class="field-label" for="export-size">Output size</label><select id="export-size"><option value="1">Original resolution</option><option value=".5">50% · half size</option><option value=".25">25% · quarter size</option></select><p id="export-note" class="export-note">Full resolution. All the little details.</p><button id="export" class="export-button">Export image ${icon('download')}</button><div class="two-buttons"><button id="copy-image">${icon('copy')} Copy image</button><button id="share">Copy settings link ↗</button></div></div>
-          <div class="preset-tools"><button id="save-preset" class="outline-button full-width">${icon('plus')} Save as preset</button><div class="two-buttons"><button id="import-preset">Import preset</button><button id="export-preset">Export preset</button></div><label class="field-label" for="saved-presets">Your saved presets</label><div class="saved-preset-row"><select id="saved-presets"><option value="">Choose a preset…</option></select><button id="delete-preset" class="icon-button" aria-label="Delete selected preset">${icon('close')}</button></div></div>
-          <button id="reset" class="reset-button">Reset everything ↺</button>
+        <aside class="inspector" aria-label="Image controls">
+          <div class="inspector-actions"><button id="upload" class="outline-button">${icon('upload')} Open image</button><button id="export" class="export-button">Export image ${icon('download')}</button></div>
+          <div class="inspector-body">
+            <section class="panel-section" aria-labelledby="dither-heading"><div class="section-title"><h2 id="dither-heading">Dithering</h2><span class="count">32 styles</span></div>
+              <div class="field-row"><label for="algorithm-select">Style</label><select id="algorithm-select">${[
+                'Diffusion',
+                'Ordered',
+                'Pattern',
+                'Other',
+              ]
+                .map(
+                  (group) =>
+                    `<optgroup label="${group}">${algorithms
+                      .filter((a) => a[2] === group)
+                      .map((a) => `<option value="${a[0]}">${a[1]}</option>`)
+                      .join('')}</optgroup>`,
+                )
+                .join('')}</select></div>
+              <div class="field-row"><label for="builtin-preset">Preset</label><select id="builtin-preset"><option value="custom">Custom settings</option><option value="0">The original</option><option value="1">Pocket nostalgia</option><option value="2">After hours</option><option value="3">Print club</option><option value="4">Signal lost</option></select><button id="shuffle" class="icon-button" aria-label="Randomize style" title="Randomize style">${icon('shuffle')}</button></div>
+              <p id="algorithm-description" class="hint"></p>
+              <div class="control-section">${slider('scale', 'Pixel scale', 1, 16, 1, '×')}${slider('strength', 'Dither strength', 0, 150, 1, '%')}${slider('patternSize', 'Pattern size', 2, 32, 1, 'px')}${slider('threshold', 'Threshold', 0, 100, 1, '%')}</div>
+            </section>
+            <section class="panel-section" aria-labelledby="palette-heading"><div class="section-title"><h2 id="palette-heading">Color</h2><span class="count" id="palette-count">2 colors</span></div>
+              <div class="field-row"><label for="color-mode">Mode</label><select id="color-mode"><option value="palette">Palette</option><option value="rgb">Full color · RGB</option></select></div>
+              <p id="cmyk-note" class="hint" hidden>CMYK uses source colors for four ink screens. Choose another style to use a palette.</p><div id="rgb-controls" hidden>${slider('levels', 'Levels per channel', 2, 16)}</div>
+              <div id="palette-controls"><div class="field-row"><label for="palette-select">Palette</label><select id="palette-select">${palettes.map((p, i) => `<option value="${i}">${p.name}</option>`).join('')}<option value="custom">Custom palette</option></select></div>
+              <div class="palette-edit"><div id="palette-colors" class="palette-colors"></div><button id="add-color" class="icon-button" aria-label="Add color" title="Add color">${icon('plus')}</button></div>
+              <div class="palette-actions"><button id="extract" class="small-link">Extract from image</button><label class="sr-only" for="extract-count">Number of extracted colors</label><select id="extract-count">${[2, 3, 4, 6, 8, 12, 16].map((n) => `<option${n === 6 ? ' selected' : ''}>${n}</option>`).join('')}</select><button id="import-palette" class="small-link">Import</button><button id="export-palette" class="small-link">Save</button></div></div>
+            </section>
+            <section class="panel-section" aria-labelledby="tone-heading"><div class="section-title"><h2 id="tone-heading">Adjustments</h2><button id="reset-adjustments" class="small-link">Reset</button></div>
+              <div class="control-section">${slider('brightness', 'Brightness', -100, 100)}${slider('contrast', 'Contrast', -100, 100)}${slider('gamma', 'Gamma', 0.2, 3, 0.05)}${slider('saturation', 'Saturation', 0, 200, 1, '%')}</div><label class="toggle-row"><input id="invert" type="checkbox"> Invert source colors</label>
+            </section>
+            <section class="panel-section" aria-labelledby="effects-heading"><div class="section-title"><h2 id="effects-heading">Effects</h2><span class="count" id="effect-count">0 / 12</span></div><p class="hint">Applied in order, after dithering.</p><div id="effect-stack"></div><div class="effect-add-row"><label class="sr-only" for="effect-type">Effect to add</label><select id="effect-type">${[
+              'Light',
+              'Color',
+              'Texture',
+              'Glitch',
+            ]
+              .map(
+                (group) =>
+                  `<optgroup label="${group}">${effectCatalog
+                    .filter((e) => e[2] === group)
+                    .map((e) => `<option value="${e[0]}">${e[1]}</option>`)
+                    .join('')}</optgroup>`,
+              )
+              .join(
+                '',
+              )}</select><button id="add-effect" class="outline-button" aria-label="Add an effect">${icon('plus')} Add</button></div></section>
+            <section class="panel-section" aria-labelledby="export-heading"><div class="section-title"><h2 id="export-heading">Output</h2><button id="copy-image" class="small-link">Copy image</button></div><div class="field-row"><label for="format">Format</label><select id="format"><option value="png">PNG · lossless</option><option value="jpg">JPG</option><option value="webp">WebP</option><option value="svg">SVG · color vectors</option><option value="svg-black">SVG · black ink</option></select></div><div class="field-row"><label for="export-size">Size</label><select id="export-size"><option value="1">Original resolution</option><option value=".5">50% · half size</option><option value=".25">25% · quarter size</option></select></div><p id="export-note" class="hint"></p></section>
+            <section class="panel-section" aria-labelledby="presets-heading"><div class="section-title"><h2 id="presets-heading">Your presets</h2><button id="save-preset" class="small-link">Save preset</button></div><div class="saved-preset-row"><label class="sr-only" for="saved-presets">Your saved presets</label><select id="saved-presets"><option value="">Choose a preset…</option></select><button id="delete-preset" class="icon-button" aria-label="Delete selected preset">${icon('close')}</button></div><div id="name-dialog" class="inline-preset" hidden><form id="name-form"><label class="field-label" for="preset-name">Preset name</label><input id="preset-name" maxlength="60" required placeholder="Name your preset"><div class="two-buttons"><button type="submit" class="outline-button">Save</button><button type="button" id="name-close" class="small-link">Cancel</button></div></form></div><div class="two-buttons"><button id="import-preset">Import preset</button><button id="export-preset">Export preset</button><button id="share">Share settings</button></div></section>
+            <section class="panel-section advanced-section" aria-labelledby="noise-heading"><h2 id="noise-heading">Noise & variation</h2><div class="seed-row"><label for="seed">Seed</label><input type="number" id="seed" min="0" max="999999" value="42"><button id="random-seed" class="icon-button" aria-label="Randomize noise seed">${icon('shuffle')}</button></div></section>
+          </div>
         </aside>
       </div>
-      <details class="preset-drawer"><summary>Presets <span>5 starting points</span></summary><div class="preset-bar"><div class="preset-intro"><h2>Starting points</h2><button id="shuffle" class="small-link">${icon('shuffle')} Surprise me</button></div><div id="preset-gallery" class="preset-gallery"></div></div></details>
     </section>
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <dialog id="effect-dialog" aria-labelledby="effect-dialog-title"><form method="dialog" class="dialog-header"><div><p class="eyebrow">ONE MORE LAYER</p><h2 id="effect-dialog-title">Find your finishing touch.</h2></div><button class="icon-button" aria-label="Close effects">${icon('close')}</button></form><p>Effects run after dithering, from top to bottom. They can introduce new colors.</p><div id="effect-picker" class="effect-picker"></div></dialog>
-  <dialog id="name-dialog" aria-labelledby="name-dialog-title"><form id="name-form"><div class="dialog-header"><h2 id="name-dialog-title">Save your recipe.</h2><button type="button" class="icon-button" id="name-close" aria-label="Close save preset">${icon('close')}</button></div><label class="field-label" for="preset-name">Preset name</label><input id="preset-name" maxlength="60" required placeholder="Something wonderfully crunchy"><button class="export-button" type="submit">Save preset ${icon('check')}</button></form></dialog>
   <dialog id="batch-dialog" aria-labelledby="batch-dialog-title"><form method="dialog" class="dialog-header"><div><p class="eyebrow">A WHOLE LOT OF PIXELS</p><h2 id="batch-dialog-title">Batch your images.</h2></div><button class="icon-button" aria-label="Close batch">${icon('close')}</button></form><p>Apply the current settings to up to 20 images. Download one ZIP of PNGs. Each image keeps its own dimensions.</p><label class="batch-drop" for="batch-input">${icon('upload')} Choose images<input id="batch-input" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/bmp" multiple></label><ul id="batch-list" class="batch-list"></ul><p id="batch-status" role="status" aria-live="polite">Nothing selected yet.</p><button id="batch-run" class="export-button" disabled>Process & download ZIP ${icon('download')}</button><button id="batch-cancel" class="small-link" hidden>Cancel batch</button></dialog>
   <dialog id="help-dialog" aria-labelledby="help-dialog-title"><form method="dialog" class="dialog-header"><div><p class="eyebrow">THE FIELD GUIDE</p><h2 id="help-dialog-title">Embrace the limitations.</h2></div><button class="icon-button" aria-label="Close guide">${icon('close')}</button></form><div class="guide-grid"><article><span>01</span><h3>Bring an image.</h3><p>Drop a PNG, JPG, WebP, AVIF, BMP, or GIF into the canvas. Paste from your clipboard, or start with our original sample. Animated files use their first frame.</p></article><article><span>02</span><h3>Find your texture.</h3><p>Diffusion gives organic grain. Ordered dithering gives a grid. Patterns give lines, dots, and halftones. Pixel scale changes texture size while preserving output dimensions.</p></article><article><span>03</span><h3>Pick your ink.</h3><p>Choose a palette, edit each swatch, or extract colors from your image. Full color mode quantizes RGB channels. CMYK uses source colors for a four-screen ink simulation.</p></article><article><span>04</span><h3>Break it beautifully.</h3><p>Add, toggle, and reorder effects. Save your settings as presets, share a settings link, or save a project with its image. Export raster images or actual SVG paths.</p></article></div><p class="guide-note">Keyboard: O opens an image; Ctrl/⌘ Z undoes; Ctrl/⌘ Shift Z redoes. Preview is reduced to 1100 px; export processes the selected full size. Images: up to 16 MP, 8192 px per side, 50 MB. SVG: up to 1 MP. Batch: 20 files, 100 MB combined.</p></dialog>
   <dialog id="about-dialog" aria-labelledby="about-dialog-title"><form method="dialog" class="dialog-header"><h2 id="about-dialog-title">Pixels for the people.</h2><button class="icon-button" aria-label="Close about">${icon('close')}</button></form><p>Dither4All is a free, MIT-licensed image editor. Your images are decoded and processed on your device. The app has no image upload endpoint, analytics, cookies, account system, or remote fonts. Presets are saved in your browser when you choose to save them.</p><p>The host receives normal web requests to load the app. Settings links contain settings only. Project files contain the image and should be shared intentionally. Clipboard access is requested only when you copy an image.</p><p>Built independently from documented dithering techniques. Custom effects are original implementations, not replicas of proprietary modules. No video or animation processing in this release.</p><a href="https://github.com/Gorskiz/Dither4All" target="_blank" rel="noopener noreferrer">Read the source, report a bug, make it better ↗</a></dialog>
@@ -128,7 +142,6 @@ $('app').innerHTML = `
 let settings = cloneSettings(defaults),
   source = makeSample(),
   sourceName = 'Orbital study',
-  family = 'All',
   view = 'output';
 let previewAbort: AbortController | null = null,
   renderTimer: ReturnType<typeof setTimeout>,
@@ -242,26 +255,8 @@ function applySettings(value: Settings) {
   scheduleRender();
 }
 function renderAlgorithms() {
-  const term = $<HTMLInputElement>('algorithm-search').value.toLowerCase();
-  const matches = algorithms.filter(
-    (a) => (family === 'All' || a[2] === family) && a[1].toLowerCase().includes(term),
-  );
-  $('algorithm-list').innerHTML =
-    matches
-      .map(
-        (a) =>
-          `<button class="algorithm ${settings.algorithm === a[0] ? 'selected' : ''}" data-algorithm="${a[0]}" aria-pressed="${settings.algorithm === a[0]}" title="${a[3]}"><span class="texture-chip texture-${a[2].toLowerCase()}" aria-hidden="true"></span><span>${a[1]}</span><span class="algorithm-check">${settings.algorithm === a[0] ? '↗' : '+'}</span></button>`,
-      )
-      .join('') || '<p class="hint">No matching textures. Try another search.</p>';
-  $('algorithm-list')
-    .querySelectorAll<HTMLButtonElement>('[data-algorithm]')
-    .forEach(
-      (button) =>
-        (button.onclick = () => {
-          change((s) => (s.algorithm = button.dataset.algorithm as AlgorithmId));
-          renderAlgorithms();
-        }),
-    );
+  $<HTMLSelectElement>('algorithm-select').value = settings.algorithm;
+  $('algorithm-description').textContent = algorithms.find((a) => a[0] === settings.algorithm)![3];
 }
 function renderEffects() {
   $('effect-count').textContent = `${settings.effects.length} / 12`;
@@ -272,7 +267,7 @@ function renderEffects() {
             `<div class="effect-layer ${e.enabled ? '' : 'muted'}"><div class="effect-top"><label><input type="checkbox" data-toggle="${i}" ${e.enabled ? 'checked' : ''}><span>${effectCatalog.find((a) => a[0] === e.type)![1]}</span></label><button data-remove="${i}" class="icon-button" aria-label="Remove ${effectCatalog.find((a) => a[0] === e.type)![1]}">${icon('close')}</button></div><div class="effect-slider"><label class="sr-only" for="effect-${i}">Effect intensity</label><input id="effect-${i}" type="range" min="0" max="100" value="${e.amount}" data-effect="${i}"><output id="effect-value-${i}">${e.amount}%</output></div><div class="effect-order"><span>LAYER ${String(i + 1).padStart(2, '0')}</span><button data-up="${i}" aria-label="Move layer ${i + 1} up" ${i === 0 ? 'disabled' : ''}>↑</button><button data-down="${i}" aria-label="Move layer ${i + 1} down" ${i === settings.effects.length - 1 ? 'disabled' : ''}>↓</button></div></div>`,
         )
         .join('')
-    : '<div class="empty-stack"><div class="stack-glyph" aria-hidden="true">▱<br>▱<br>▱</div><p>A little extra, if you want it.</p><span>24 effects. Endless combinations.</span></div>';
+    : '<p class="empty-stack hint">No effects. Choose one below to add a layer.</p>';
   $('effect-stack')
     .querySelectorAll<HTMLInputElement>('[data-toggle]')
     .forEach(
@@ -318,11 +313,11 @@ function renderEffects() {
   $<HTMLButtonElement>('add-effect').disabled = settings.effects.length >= 12;
 }
 function renderColors() {
-  $('palette-count').textContent = String(settings.palette.length);
+  $('palette-count').textContent = `${settings.palette.length} colors`;
   $('palette-colors').innerHTML = settings.palette
     .map(
       (color, i) =>
-        `<div class="color-row"><label class="color-swatch" style="--swatch:${color}"><span class="sr-only">Palette color ${i + 1}</span><input type="color" value="${color}" data-color="${i}"></label><span class="mono">${color.toUpperCase()}</span><button class="icon-button" data-remove-color="${i}" aria-label="Remove palette color ${i + 1}" ${settings.palette.length <= 2 ? 'disabled' : ''}>${icon('close')}</button></div>`,
+        `<div class="color-row"><label class="color-swatch" style="--swatch:${color}" title="${color.toUpperCase()}"><span class="sr-only">Palette color ${i + 1}</span><input type="color" value="${color}" data-color="${i}"></label><span class="sr-only mono">${color.toUpperCase()}</span><button class="icon-button" data-remove-color="${i}" aria-label="Remove palette color ${i + 1}" ${settings.palette.length <= 2 ? 'disabled' : ''}>${icon('close')}</button></div>`,
     )
     .join('');
   $('palette-colors')
@@ -362,6 +357,8 @@ function syncControls() {
   $('palette-controls').hidden = cmyk || settings.colorMode === 'rgb';
   const pattern = algorithms.find((a) => a[0] === settings.algorithm)?.[2] === 'Pattern';
   $<HTMLInputElement>('patternSize').disabled = !pattern;
+  $<HTMLInputElement>('patternSize').hidden = !pattern;
+  document.querySelector<HTMLLabelElement>('label[for="patternSize"]')!.hidden = !pattern;
   $<HTMLInputElement>('strength').disabled = cmyk || settings.algorithm === 'threshold';
   $<HTMLInputElement>('threshold').disabled = cmyk;
   for (const id of ['patternSize', 'strength', 'threshold']) {
@@ -374,6 +371,11 @@ function syncControls() {
   );
   $<HTMLSelectElement>('palette-select').value = paletteIndex < 0 ? 'custom' : String(paletteIndex);
   if (!document.activeElement?.matches('[data-color]')) renderColors();
+  renderAlgorithms();
+  const preset = builtinPresets.findIndex(
+    (p) => JSON.stringify(p.settings) === JSON.stringify(settings),
+  );
+  $<HTMLSelectElement>('builtin-preset').value = preset < 0 ? 'custom' : String(preset);
   syncHistory();
   updateExportNote();
 }
@@ -486,7 +488,6 @@ async function loadImage(file: Blob, name: string) {
   historyIndex = 0;
   syncHistory();
   scheduleRender();
-  renderPresetGallery();
   toast('Image opened. Make something good.');
 }
 function setView(value: string) {
@@ -514,8 +515,15 @@ function updateZoom() {
   const value = $<HTMLSelectElement>('zoom').value,
     stage = $('drop-zone');
   if (!stage.clientWidth || !stage.clientHeight) return;
-  const availableW = Math.max(1, stage.clientWidth - 64),
-    availableH = Math.max(1, stage.clientHeight - 90);
+  const padding = getComputedStyle(stage);
+  const availableW = Math.max(
+      1,
+      stage.clientWidth - parseFloat(padding.paddingLeft) - parseFloat(padding.paddingRight) - 4,
+    ),
+    availableH = Math.max(
+      1,
+      stage.clientHeight - parseFloat(padding.paddingTop) - parseFloat(padding.paddingBottom) - 4,
+    );
   const width =
     value === 'fit'
       ? Math.min(availableW, (availableH * source.width) / source.height)
@@ -609,53 +617,6 @@ function storePresets(presets: ReturnType<typeof savedPresets>) {
   }
   renderSavedPresets();
 }
-function renderPresetGallery() {
-  $('preset-gallery').innerHTML = builtinPresets
-    .map(
-      (p, i) =>
-        `<button class="preset-card" data-preset="${i}"><canvas id="preset-thumb-${i}" aria-hidden="true"></canvas><span class="preset-title">${p.name}<span>↗</span></span><span class="preset-tag">${p.tag}</span></button>`,
-    )
-    .join('');
-  const small = sourceAtSize(156),
-    pixels = canvasPixels(small);
-  builtinPresets.forEach((p, i) => {
-    const s = cloneSettings(p.settings);
-    s.scale = 1;
-    s.patternSize = 4;
-    const result = processImage(pixels, s),
-      canvas = $<HTMLCanvasElement>(`preset-thumb-${i}`);
-    canvas.width = result.width;
-    canvas.height = result.height;
-    canvas
-      .getContext('2d')!
-      .putImageData(
-        new ImageData(new Uint8ClampedArray(result.data), result.width, result.height),
-        0,
-        0,
-      );
-  });
-  $('preset-gallery')
-    .querySelectorAll<HTMLButtonElement>('[data-preset]')
-    .forEach(
-      (el) =>
-        (el.onclick = () => {
-          applySettings(builtinPresets[+el.dataset.preset!].settings);
-          selectWorkspace('image');
-          toast(`Loaded “${builtinPresets[+el.dataset.preset!].name}”.`);
-        }),
-    );
-}
-function selectWorkspace(value: string) {
-  document.querySelector<HTMLElement>('.studio')!.dataset.workspace = value;
-  document.querySelectorAll<HTMLButtonElement>('.workspace-tabs button').forEach((button) => {
-    button.setAttribute('aria-pressed', String(button.dataset.workspace === value));
-  });
-  requestAnimationFrame(updateZoom);
-}
-document.querySelectorAll<HTMLButtonElement>('.workspace-tabs button').forEach((button) => {
-  button.onclick = () => selectWorkspace(button.dataset.workspace!);
-});
-
 function openDialog(id: string) {
   $<HTMLDialogElement>(id).showModal();
 }
@@ -669,44 +630,12 @@ document.querySelectorAll<HTMLDialogElement>('dialog').forEach((dialog) =>
     }
   }),
 );
-function selectTab(name: string) {
-  document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((el) => {
-    const selected = el.dataset.tab === name;
-    el.setAttribute('aria-selected', String(selected));
-    el.tabIndex = selected ? 0 : -1;
-    $(`tab-${el.dataset.tab}`).hidden = !selected;
-  });
-}
-document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((el, index) => {
-  el.onclick = () => selectTab(el.dataset.tab!);
-  el.onkeydown = (e) => {
-    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
-      e.preventDefault();
-      const tabs = [...document.querySelectorAll<HTMLButtonElement>('[data-tab]')],
-        next =
-          e.key === 'Home'
-            ? 0
-            : e.key === 'End'
-              ? 2
-              : (index + (e.key === 'ArrowRight' ? 1 : 2)) % 3;
-      selectTab(tabs[next].dataset.tab!);
-      tabs[next].focus();
-    }
-  };
-});
-document.querySelectorAll<HTMLButtonElement>('[data-family]').forEach(
-  (el) =>
-    (el.onclick = () => {
-      family = el.dataset.family!;
-      document
-        .querySelectorAll('[data-family]')
-        .forEach((b) =>
-          b.setAttribute('aria-pressed', String((b as HTMLElement).dataset.family === family)),
-        );
-      renderAlgorithms();
-    }),
-);
-$('algorithm-search').oninput = () => renderAlgorithms();
+$<HTMLSelectElement>('algorithm-select').onchange = () =>
+  change((s) => (s.algorithm = $<HTMLSelectElement>('algorithm-select').value as AlgorithmId));
+$<HTMLSelectElement>('builtin-preset').onchange = () => {
+  const value = $<HTMLSelectElement>('builtin-preset').value;
+  if (value !== 'custom') applySettings(builtinPresets[Number(value)].settings);
+};
 document.querySelectorAll<HTMLInputElement>('[data-setting]').forEach((el) => {
   el.oninput = () =>
     change(
@@ -806,7 +735,6 @@ bind('sample', () => {
   source = makeSample();
   sourceName = 'Orbital study';
   scheduleRender();
-  renderPresetGallery();
 });
 let dragDepth = 0;
 document.addEventListener('dragover', (e) => {
@@ -855,31 +783,18 @@ document.addEventListener('keydown', (e) => {
     $(e.shiftKey ? 'redo' : 'undo').click();
   }
 });
-bind('add-effect', () => openDialog('effect-dialog'));
-$('effect-picker').innerHTML = effectCatalog
-  .map(
-    (e) =>
-      `<button data-add-effect="${e[0]}"><span>${e[1]}</span><small>${e[2]}</small><span>+</span></button>`,
-  )
-  .join('');
-$('effect-picker')
-  .querySelectorAll<HTMLButtonElement>('[data-add-effect]')
-  .forEach(
-    (el) =>
-      (el.onclick = () => {
-        if (settings.effects.length >= 12) return;
-        change((s) =>
-          s.effects.push({
-            id: crypto.randomUUID(),
-            type: el.dataset.addEffect as EffectId,
-            amount: 40,
-            enabled: true,
-          }),
-        );
-        renderEffects();
-        $<HTMLDialogElement>('effect-dialog').close();
-      }),
+bind('add-effect', () => {
+  if (settings.effects.length >= 12) return;
+  change((s) =>
+    s.effects.push({
+      id: crypto.randomUUID(),
+      type: $<HTMLSelectElement>('effect-type').value as EffectId,
+      amount: 40,
+      enabled: true,
+    }),
   );
+  renderEffects();
+});
 bind('export', () => exportImage());
 bind('copy-image', () => exportImage(true));
 $('format').onchange = updateExportNote;
@@ -897,16 +812,17 @@ bind('save-preset', () => {
   if (savedPresets().length >= 50)
     throw new Error('You have 50 saved presets. Delete one or export a JSON.');
   $<HTMLInputElement>('preset-name').value = '';
-  openDialog('name-dialog');
+  $('name-dialog').hidden = false;
+  $('preset-name').focus();
 });
-bind('name-close', () => $<HTMLDialogElement>('name-dialog').close());
+bind('name-close', () => ($('name-dialog').hidden = true));
 $('name-form').onsubmit = (e) => {
   e.preventDefault();
   safely(() => {
     const name = $<HTMLInputElement>('preset-name').value.trim();
     if (!name) throw new Error('Give your preset a name.');
     storePresets([...savedPresets(), { name, settings: cloneSettings(settings) }]);
-    $<HTMLDialogElement>('name-dialog').close();
+    $('name-dialog').hidden = true;
     toast('Preset saved on this device.');
   });
 };
@@ -989,7 +905,6 @@ $<HTMLInputElement>('project-input').onchange = (e) =>
     syncControls();
     renderAlgorithms();
     renderEffects();
-    renderPresetGallery();
     scheduleRender();
     input.value = '';
     toast('Project opened.');
@@ -1085,5 +1000,5 @@ syncControls();
 renderAlgorithms();
 renderEffects();
 renderSavedPresets();
-renderPresetGallery();
+
 scheduleRender();

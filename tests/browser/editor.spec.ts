@@ -25,23 +25,22 @@ test('image editor processes locally, compares, edits, undoes, and exports real 
   await page.getByLabel('Original / dithered split').fill('30');
   await expect(page.locator('#output-canvas')).toHaveCSS('clip-path', 'inset(0px 0px 0px 30%)');
   await page.getByRole('button', { name: 'Dithered', exact: true }).click();
-  await page.getByRole('button', { name: 'Bayer 4 × 4', exact: false }).click();
+  await page.getByLabel('Style', { exact: true }).selectOption('bayer-4');
   await expect(page.locator('#render-status')).toContainText('Bayer 4 × 4');
   await page.getByRole('button', { name: 'Undo settings', exact: true }).click();
   await expect(page.locator('#render-status')).toContainText('Floyd–Steinberg');
-  await page.getByRole('tab', { name: 'Palette', exact: true }).click();
-  await page.getByLabel('Palette library').selectOption('2');
+  await page.getByLabel('Palette', { exact: true }).selectOption('2');
   await expect(page.locator('#palette-colors input')).toHaveCount(4);
+  await page.getByLabel('Effect to add').selectOption('scanlines');
   await page.getByRole('button', { name: 'Add an effect', exact: true }).click();
-  await page.locator('[data-add-effect="scanlines"]').click();
   await expect(page.locator('.effect-layer')).toHaveCount(1);
-  await page.getByRole('button', { name: 'Save as preset', exact: true }).click();
-  await page.getByLabel('Preset name').fill('Browser test');
   await page.getByRole('button', { name: 'Save preset', exact: true }).click();
+  await page.getByLabel('Preset name').fill('Browser test');
+  await page.locator('#name-form').getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.locator('#saved-presets')).toContainText('Browser test');
   for (const format of ['png', 'jpg', 'webp', 'svg', 'svg-black']) {
-    await page.getByLabel('Export format').selectOption(format);
-    await page.getByLabel('Output size').selectOption('.5');
+    await page.getByLabel('Format', { exact: true }).selectOption(format);
+    await page.getByLabel('Size', { exact: true }).selectOption('.5');
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export image', exact: true }).click();
     const file = await download,
@@ -70,8 +69,7 @@ test('project round trip, malformed input, palette import, and image batch', asy
   await page.getByRole('button', { name: 'Save project', exact: true }).click();
   const file = await saved,
     projectPath = await file.path();
-  await page.locator('.preset-drawer > summary').click();
-  await page.getByRole('button', { name: 'Signal lost', exact: false }).click();
+  await page.getByLabel('Preset', { exact: true }).selectOption('4');
   await expect(page.locator('.effect-layer')).toHaveCount(2);
   await page.locator('#project-input').setInputFiles(projectPath!);
   await expect(page.locator('.effect-layer')).toHaveCount(0);
@@ -81,7 +79,6 @@ test('project round trip, malformed input, palette import, and image batch', asy
     buffer: Buffer.from('{"settings":{"algorithm":"nonsense"}}'),
   });
   await expect(page.locator('#toast')).toContainText('Unknown dithering algorithm');
-  await page.getByRole('tab', { name: 'Palette', exact: true }).click();
   await page.locator('#palette-input').setInputFiles({
     name: 'palette.json',
     mimeType: 'application/json',
@@ -91,7 +88,7 @@ test('project round trip, malformed input, palette import, and image batch', asy
   const png = await page
     .locator('#original-canvas')
     .evaluate((c: HTMLCanvasElement) => c.toDataURL().split(',')[1]);
-  await page.getByRole('button', { name: 'Batch images', exact: true }).click();
+  await page.getByRole('button', { name: 'Batch', exact: true }).click();
   await page.locator('#batch-input').setInputFiles([
     { name: 'one.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') },
     { name: 'two.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') },
@@ -106,56 +103,52 @@ test('project round trip, malformed input, palette import, and image batch', asy
   await expect(page.locator('#batch-status')).toContainText('Done. 2 images');
 });
 
-test('editor and effects dialog expose accessible names and readable controls', async ({
+test('continuous inspector exposes core tools together without editing dialogs', async ({
   page,
 }) => {
   await page.goto('/');
   await expect(page.locator('#render-status')).toContainText('ms');
+  await expect(page.getByRole('tablist')).toHaveCount(0);
+  for (const name of ['Style', 'Palette', 'Brightness', 'Contrast'])
+    await expect(page.getByLabel(name, { exact: true })).toBeVisible();
   const editor = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
     .analyze();
   expect(editor.violations).toEqual([]);
+  await page.getByLabel('Effect to add').selectOption('glow');
   await page.getByRole('button', { name: 'Add an effect', exact: true }).click();
-  const dialog = await new AxeBuilder({ page })
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.effect-layer')).toHaveCount(1);
+  const withEffect = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
     .analyze();
-  expect(dialog.violations).toEqual([]);
-  await page.getByRole('button', { name: 'Close effects', exact: true }).click();
-  await page.getByRole('tab', { name: 'Dither', exact: true }).focus();
-  await page.keyboard.press('ArrowLeft');
-  await expect(page.getByRole('tab', { name: 'Palette', exact: true })).toBeFocused();
-  await page.getByRole('tab', { name: 'Dither', exact: true }).click();
-  await page.getByRole('button', { name: 'Pattern', exact: true }).click();
-  await page.getByRole('button', { name: 'CMYK halftone', exact: false }).click();
+  expect(withEffect.violations).toEqual([]);
+  await page.getByLabel('Style', { exact: true }).selectOption('cmyk');
   await expect(page.getByLabel('Dither strength')).toBeDisabled();
   await expect(page.getByLabel('Pattern size')).toBeEnabled();
-  await page.getByRole('tab', { name: 'Palette', exact: true }).click();
   await expect(page.locator('#cmyk-note')).toBeVisible();
-  await expect(page.getByLabel('Color mode')).toBeDisabled();
+  await expect(page.getByLabel('Mode', { exact: true })).toBeDisabled();
 });
 
-test('mobile layout stays within viewport and dialogs remain usable', async ({ page }) => {
+test('mobile adjustments keep the image visible above the continuous inspector', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await expect(page.locator('#render-status')).toContainText('ms');
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-  await page.getByRole('button', { name: 'Effects & export', exact: true }).click();
-  await page.getByRole('button', { name: 'Add an effect', exact: true }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await page.getByRole('button', { name: 'Close effects', exact: true }).click();
-  await page.getByRole('button', { name: 'Image', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Image', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await expect(page.getByRole('button', { name: 'Effects & export', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'false',
-  );
-  await page.screenshot({ path: 'test-results/editor-mobile.png', fullPage: true });
+  await page.getByLabel('Contrast', { exact: true }).fill('35');
+  await expect(page.locator('#render-status')).toContainText('ms');
+  await expect(page.locator('#output-canvas')).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Export image', exact: true })).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(844);
+  const scan = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  expect(scan.violations).toEqual([]);
+  await page.screenshot({ path: 'test-results/editor-mobile.png' });
 });
 
-test('workspace fills the viewport and keeps panels usable when resized', async ({ page }) => {
+test('canvas and inspector share the viewport at desktop, tablet, and phone sizes', async ({
+  page,
+}) => {
   await page.goto('/');
   await expect(page.locator('#render-status')).toContainText('ms');
   for (const [width, height] of [
@@ -165,6 +158,7 @@ test('workspace fills the viewport and keeps panels usable when resized', async 
     [1024, 768],
     [820, 900],
     [390, 844],
+    [320, 700],
   ]) {
     await page.setViewportSize({ width, height });
     const bounds = await page.locator('.studio').boundingBox();
@@ -177,18 +171,7 @@ test('workspace fills the viewport and keeps panels usable when resized', async 
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width,
     );
-    if (width >= 1200) {
-      const first = await page.getByRole('button', { name: 'All', exact: true }).boundingBox();
-      const last = await page.getByRole('button', { name: 'Other', exact: true }).boundingBox();
-      expect(first!.y).toBe(last!.y);
-    }
-    if (width <= 1000) {
-      await page.getByRole('button', { name: 'Dither & color', exact: true }).click();
-      await expect(page.getByRole('tab', { name: 'Dither', exact: true })).toBeVisible();
-      await page.getByRole('button', { name: 'Effects & export', exact: true }).click();
-      await expect(page.getByRole('button', { name: 'Export image', exact: true })).toBeVisible();
-      await page.getByRole('button', { name: 'Image', exact: true }).click();
-    }
-    await expect(page.locator('#output-canvas')).toBeVisible();
+    await expect(page.locator('#output-canvas')).toBeInViewport();
+    await expect(page.locator('.inspector-actions')).toBeInViewport();
   }
 });

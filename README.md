@@ -25,7 +25,7 @@ Requires Node.js 22.12+; Node.js 24 is used in CI.
 - **24 stackable effects:** glow, bloom, chromatic aberration, RGB split, scanlines, grain, vignette, color adjustments, distortion, glitch, edge ink, and more. Toggle, reorder, or adjust up to 12 layers.
 - **Color:** 12 built-in palettes, editable 2–16-color palettes, median-cut extraction, RGB quantization, and JSON/hex/GIMP palette imports and exports.
 - **Image adjustments:** pixel scale, strength, threshold, pattern size, brightness, contrast, gamma, saturation, inversion, and a reproducible random seed.
-- **Workflow:** before/after comparison, zoom, undo/redo, drag and drop, clipboard paste/copy, five starting presets, saved browser presets, portable preset files, and settings links.
+- **Workflow:** a continuous photo-editor inspector beside a persistent canvas, before/after comparison, zoom, undo/redo, drag and drop, clipboard paste/copy, five starting presets, saved browser presets, portable preset files, and settings links.
 - **Files:** PNG/JPEG/WebP, SVG pixel-run paths in color or black ink, embedded-image `.d4a` project files, and batch processing to a ZIP.
 
 All image decoding and processing happens on your device. No accounts, telemetry, remote fonts, image uploads, API keys, or backend. The host still receives ordinary requests to load the app. Local presets use browser storage. Shared settings links contain no image; project files do contain the source image.

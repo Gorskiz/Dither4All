@@ -1,12 +1,11 @@
 :root {
-  --paper: #f4f3e9;
-  --panel: #f0f1e6;
-  --ink: #20271f;
-  --muted: #566049;
-  --line: #d7dbcc;
-  --lime: #d7ed83;
-  --olive: #5c6b2c;
-  --orange: #ba4223;
-  --canvas: #dce2cf;
-  color-scheme: light;
+  --paper: #202329;
+  --panel: #2a2e35;
+  --ink: #e9ecf1;
+  --muted: #aeb7c5;
+  --line: #424955;
+  --accent: #a4c9f1;
+  --orange: #ffc08b;
+  --canvas: #17191e;
+  color-scheme: dark;
 }
