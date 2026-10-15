@@ -95,6 +95,9 @@ test('video import, trim, keyframe project relink, and audio-preserving MP4/WebM
   const file = { name: 'moving-test.webm', mimeType: 'video/webm', buffer: Buffer.from(bytes) };
   await page.locator('#image-input').setInputFiles(file);
   await expect(page.locator('#motion-kind')).toHaveText('160 × 120');
+  await page.getByLabel('Style', { exact: true }).selectOption('blue-noise');
+  await page.getByLabel('Space', { exact: true }).selectOption('linear');
+  await page.getByLabel('Match', { exact: true }).selectOption('lab');
   await page.getByLabel('In (s)', { exact: true }).fill('0.5');
   await page.getByLabel('In (s)', { exact: true }).press('Tab');
   await page.getByLabel('Out (s)', { exact: true }).fill('1.5');

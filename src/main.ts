@@ -10,7 +10,6 @@ import {
   type AlgorithmId,
   type EffectId,
 } from './engine/catalog';
-import { extractPalette } from './engine/color';
 import type { Pixels } from './engine/process';
 import {
   canvasPixels,
@@ -71,15 +70,19 @@ $('app').innerHTML = `
           <div class="preview-toolbar"><div class="view-modes" aria-label="Preview mode"><button data-view="output" aria-pressed="true">Dithered</button><button data-view="split" aria-pressed="false">Compare</button><button data-view="original" aria-pressed="false">Original</button></div><div class="history-buttons"><button id="undo" class="icon-button" aria-label="Undo settings" title="Undo (Ctrl/⌘ Z)">${icon('undo')}</button><button id="redo" class="icon-button" aria-label="Redo settings" title="Redo (Ctrl/⌘ Shift Z)">${icon('redo')}</button><button id="reset" class="icon-button" aria-label="Reset settings" title="Reset all settings">↺</button></div></div>
           <div id="drop-zone" class="canvas-stage"><div class="drop-hint">Drop an image or video to open</div><div id="canvas-frame" class="canvas-frame"><canvas id="original-canvas" aria-label="Original image"></canvas><canvas id="output-canvas" aria-label="Dithered image"></canvas><div id="split-line" class="split-line" hidden><span>↔</span></div><span id="image-badge" class="sr-only">Dithered preview</span></div></div>
           <div id="compare-control" class="compare-control" hidden><label for="compare">Original / dithered split</label><input id="compare" type="range" min="0" max="100" value="50"></div>
-          <div class="canvas-bottom"><span id="dimensions">1200 × 900</span><button id="sample" class="small-link">Use sample</button><label class="zoom-label" for="zoom">Zoom <select id="zoom"><option value="fit">Fit</option><option value="50">50%</option><option value="100">100%</option><option value="200">200%</option></select></label></div>
+          <div class="canvas-bottom"><span id="dimensions">1200 × 900</span><button id="sample" class="small-link">Use sample</button><label class="zoom-label" for="zoom">Zoom <select id="zoom" aria-label="Zoom"><option value="fit">Fit</option><option value="50">50%</option><option value="100">100%</option><option value="200">200%</option></select></label></div>
           <div class="preview-status"><span id="render-status" role="status" aria-live="polite">Preparing preview…</span><span>${icon('shield')} Local processing</span></div>
         </section>
         <aside class="inspector" aria-label="Image controls">
           <div class="inspector-actions"><button id="upload" class="outline-button">${icon('upload')} Open media</button><button id="export" class="export-button">Export image ${icon('download')}</button></div>
           <div class="inspector-body">
-            <section class="panel-section" aria-labelledby="dither-heading"><div class="section-title"><h2 id="dither-heading">Dithering</h2><span class="count">32 styles</span></div>
-              <div class="field-row"><label for="algorithm-select">Style</label><select id="algorithm-select">${[
+            <section class="panel-section" aria-labelledby="dither-heading"><div class="section-title"><h2 id="dither-heading">Dithering</h2><span class="count">${algorithms.length} styles</span></div>
+              <div class="field-row style-search"><label for="style-search">Find</label><input id="style-search" type="search" placeholder="Search ${algorithms.length} styles" autocomplete="off"></div><div class="field-row"><label for="algorithm-select">Style</label><select id="algorithm-select">${[
                 'Diffusion',
+                'Variable diffusion',
+                'Curve diffusion',
+                'Dot diffusion',
+                'Tiles',
                 'Ordered',
                 'Pattern',
                 'Other',
@@ -94,14 +97,14 @@ $('app').innerHTML = `
                 .join('')}</select></div>
               <div class="field-row"><label for="builtin-preset">Preset</label><select id="builtin-preset"><option value="custom">Custom settings</option><option value="0">The original</option><option value="1">Pocket nostalgia</option><option value="2">After hours</option><option value="3">Print club</option><option value="4">Signal lost</option></select><button id="shuffle" class="icon-button" aria-label="Randomize style" title="Randomize style">${icon('shuffle')}</button></div>
               <p id="algorithm-description" class="hint"></p>
-              <div class="control-section">${slider('scale', 'Pixel scale', 1, 16, 1, '×')}${slider('strength', 'Dither strength', 0, 150, 1, '%')}${slider('patternSize', 'Pattern size', 2, 32, 1, 'px')}${slider('threshold', 'Threshold', 0, 100, 1, '%')}</div>
+              <div class="control-section">${slider('scale', 'Pixel scale', 1, 16, 1, '×')}${slider('strength', 'Dither strength', 0, 150, 1, '%')}${slider('patternSize', 'Pattern size', 2, 32, 1, 'px')}${slider('threshold', 'Threshold', 0, 100, 1, '%')}${slider('jitter', 'Jitter', 0, 100, 1, '%')}<div id="matrix-step-controls" class="control-subsection" hidden>${slider('matrixStep', 'Matrix step', 1, 128)}</div><div id="history-controls" class="control-subsection" hidden>${slider('errorHistory', 'Error history', 4, 64)}</div></div><label id="serpentine-row" class="toggle-row"><input id="serpentine" type="checkbox"> Serpentine scan</label><div id="matrix-rotation-row" class="field-row" hidden><label for="matrix-rotation">Rotate</label><select id="matrix-rotation"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
             </section>
             <section class="panel-section" aria-labelledby="palette-heading"><div class="section-title"><h2 id="palette-heading">Color</h2><span class="count" id="palette-count">2 colors</span></div>
-              <div class="field-row"><label for="color-mode">Mode</label><select id="color-mode"><option value="palette">Palette</option><option value="rgb">Full color · RGB</option></select></div>
+              <div class="field-row"><label for="working-space">Space</label><select id="working-space"><option value="srgb">sRGB · classic</option><option value="linear">Linear light · accurate mixing</option></select></div><div class="field-row"><label for="color-distance">Match</label><select id="color-distance"><option value="weighted-rgb">Weighted RGB · classic</option><option value="rgb">RGB distance</option><option value="lab">CIELAB · perceptual</option><option value="ciede2000">CIEDE2000 · perceptual, slower</option><option value="luminance">Luminance only</option></select></div><div class="field-row"><label for="color-mode">Mode</label><select id="color-mode"><option value="palette">Palette</option><option value="rgb">Full color · RGB</option></select></div>
               <p id="cmyk-note" class="hint" hidden>CMYK uses source colors for four ink screens. Choose another style to use a palette.</p><div id="rgb-controls" hidden>${slider('levels', 'Levels per channel', 2, 16)}</div>
               <div id="palette-controls"><div class="field-row"><label for="palette-select">Palette</label><select id="palette-select">${palettes.map((p, i) => `<option value="${i}">${p.name}</option>`).join('')}<option value="custom">Custom palette</option></select></div>
               <div class="palette-edit"><div id="palette-colors" class="palette-colors"></div><button id="add-color" class="icon-button" aria-label="Add color" title="Add color">${icon('plus')}</button></div>
-              <div class="palette-actions"><button id="extract" class="small-link">Extract from image</button><label class="sr-only" for="extract-count">Number of extracted colors</label><select id="extract-count">${[2, 3, 4, 6, 8, 12, 16].map((n) => `<option${n === 6 ? ' selected' : ''}>${n}</option>`).join('')}</select><button id="import-palette" class="small-link">Import</button><button id="export-palette" class="small-link">Save</button></div></div>
+              <div class="field-row"><label for="quantizer">Extract</label><select id="quantizer"><option value="median-cut">Median cut · balanced</option><option value="wu">Wu · variance</option><option value="kmeans">K-means · refined</option></select></div><div class="palette-actions"><button id="extract" class="small-link">Extract from image</button><label class="sr-only" for="extract-count">Number of extracted colors</label><select id="extract-count">${[2, 3, 4, 6, 8, 12, 16, 32, 64, 128, 256].map((n) => `<option${n === 6 ? ' selected' : ''}>${n}</option>`).join('')}</select><button id="import-palette" class="small-link">Import</button><button id="export-palette" class="small-link">Save</button></div></div>
             </section>
             <section class="panel-section" aria-labelledby="tone-heading"><div class="section-title"><h2 id="tone-heading">Adjustments</h2><button id="reset-adjustments" class="small-link">Reset</button></div>
               <div class="control-section">${slider('brightness', 'Brightness', -100, 100)}${slider('contrast', 'Contrast', -100, 100)}${slider('gamma', 'Gamma', 0.2, 3, 0.05)}${slider('saturation', 'Saturation', 0, 200, 1, '%')}</div><label class="toggle-row"><input id="invert" type="checkbox"> Invert source colors</label>
@@ -132,8 +135,8 @@ $('app').innerHTML = `
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <dialog id="batch-dialog" aria-labelledby="batch-dialog-title"><form method="dialog" class="dialog-header"><div><p class="eyebrow">A WHOLE LOT OF PIXELS</p><h2 id="batch-dialog-title">Batch your images.</h2></div><button class="icon-button" aria-label="Close batch">${icon('close')}</button></form><p>Apply the current settings to up to 20 images. Download one ZIP of PNGs. Each image keeps its own dimensions.</p><label class="batch-drop" for="batch-input">${icon('upload')} Choose images<input id="batch-input" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/bmp" multiple></label><ul id="batch-list" class="batch-list"></ul><p id="batch-status" role="status" aria-live="polite">Nothing selected yet.</p><button id="batch-run" class="export-button" disabled>Process & download ZIP ${icon('download')}</button><button id="batch-cancel" class="small-link" hidden>Cancel batch</button></dialog>
-  <dialog id="help-dialog" aria-labelledby="help-dialog-title"><form method="dialog" class="dialog-header"><div><p class="eyebrow">THE FIELD GUIDE</p><h2 id="help-dialog-title">Embrace the limitations.</h2></div><button class="icon-button" aria-label="Close guide">${icon('close')}</button></form><div class="guide-grid"><article><span>01</span><h3>Bring an image.</h3><p>Drop a PNG, JPG, WebP, AVIF, BMP, or GIF into the canvas. Paste from your clipboard, or start with our original sample. Animated image imports use their first frame. Open MP4, WebM or MOV to process video; choose Animate image for stills. Use Space to play, scrub the timeline, set trim points, and add adjustment keyframes. Export MP4, WebM, GIF, or a ZIP of PNG frames. Video projects store a poster and timeline; reopen the original video to relink.</p></article><article><span>02</span><h3>Find your texture.</h3><p>Diffusion gives organic grain. Ordered dithering gives a grid. Patterns give lines, dots, and halftones. Pixel scale changes texture size while preserving output dimensions.</p></article><article><span>03</span><h3>Pick your ink.</h3><p>Choose a palette, edit each swatch, or extract colors from your image. Full color mode quantizes RGB channels. CMYK uses source colors for a four-screen ink simulation.</p></article><article><span>04</span><h3>Break it beautifully.</h3><p>Add, toggle, and reorder effects. Save your settings as presets, share a settings link, or save a project with its image. Export raster images or actual SVG paths.</p></article></div><p class="guide-note">Keyboard: O opens an image; Ctrl/⌘ Z undoes; Ctrl/⌘ Shift Z redoes. Preview is reduced to 1100 px; export processes the selected full size. Images: up to 16 MP, 8192 px per side, 50 MB. SVG: up to 1 MP. Batch: 20 files, 100 MB combined.</p></dialog>
-  <dialog id="about-dialog" aria-labelledby="about-dialog-title"><form method="dialog" class="dialog-header"><h2 id="about-dialog-title">Pixels for the people.</h2><button class="icon-button" aria-label="Close about">${icon('close')}</button></form><p>Dither4All is a free, MIT-licensed image editor. Your images are decoded and processed on your device. The app has no image upload endpoint, analytics, cookies, account system, or remote fonts. Presets are saved in your browser when you choose to save them.</p><p>The host receives normal web requests to load the app. Settings links contain settings only. Project files contain the image and should be shared intentionally. Clipboard access is requested only when you copy an image.</p><p>Built independently from documented dithering techniques. Custom effects are original implementations, not replicas of proprietary modules. Video and still animation use the same local effects engine. MP4/WebM encoding depends on browser codecs. <a href="./third-party-notices.txt" target="_blank">Media libraries and licenses</a>.</p><a href="https://github.com/Gorskiz/Dither4All" target="_blank" rel="noopener noreferrer">Read the source, report a bug, make it better ↗</a></dialog>
+  <dialog id="help-dialog" aria-labelledby="help-dialog-title"><form method="dialog" class="dialog-header"><div><p class="eyebrow">THE FIELD GUIDE</p><h2 id="help-dialog-title">Embrace the limitations.</h2></div><button class="icon-button" aria-label="Close guide">${icon('close')}</button></form><div class="guide-grid"><article><span>01</span><h3>Bring an image.</h3><p>Drop a PNG, JPG, WebP, AVIF, BMP, or GIF into the canvas. Paste from your clipboard, or start with our original sample. Animated image imports use their first frame. Open MP4, WebM or MOV to process video; choose Animate image for stills. Use Space to play, scrub the timeline, set trim points, and add adjustment keyframes. Export MP4, WebM, GIF, or a ZIP of PNG frames. Video projects store a poster and timeline; reopen the original video to relink.</p></article><article><span>02</span><h3>Find your texture.</h3><p>Diffusion gives organic grain. Ordered dithering gives a grid. Patterns give lines, dots, and halftones. Pixel scale changes texture size while preserving output dimensions.</p></article><article><span>03</span><h3>Pick your ink.</h3><p>Choose a palette, edit each swatch, or extract colors from your image. Full color mode quantizes RGB channels. CMYK uses source colors for a four-screen ink simulation.</p></article><article><span>04</span><h3>Break it beautifully.</h3><p>Add, toggle, and reorder effects. Save your settings as presets, share a settings link, or save a project with its image. Export raster images or actual SVG paths.</p></article></div><p class="guide-note">Keyboard: O opens media; + / − zoom; . resets zoom; double-click the canvas to fit; Ctrl/⌘ Z undoes; Ctrl/⌘ Shift Z redoes. Preview is reduced to 1100 px; export processes the selected full size. Images: up to 16 MP, 8192 px per side, 50 MB. SVG: up to 1 MP. Batch: 20 files, 100 MB combined.</p></dialog>
+  <dialog id="about-dialog" aria-labelledby="about-dialog-title"><form method="dialog" class="dialog-header"><h2 id="about-dialog-title">Pixels for the people.</h2><button class="icon-button" aria-label="Close about">${icon('close')}</button></form><p>Dither4All is a free, MIT-licensed image editor. Your images are decoded and processed on your device. The app has no image upload endpoint, analytics, cookies, account system, or remote fonts. Presets are saved in your browser when you choose to save them.</p><p>The host receives normal web requests to load the app. Settings links contain settings only. Project files contain the image and should be shared intentionally. Clipboard access is requested only when you copy an image.</p><p>Built from documented dithering techniques, with credited libdither algorithm/table adaptations inspired by Ditherista. Custom effects are original implementations, not replicas of proprietary modules. Video and still animation use the same local effects engine. MP4/WebM encoding depends on browser codecs. <a href="./third-party-notices.txt" target="_blank">Media libraries and licenses</a>.</p><a href="https://github.com/Gorskiz/Dither4All" target="_blank" rel="noopener noreferrer">Read the source, report a bug, make it better ↗</a></dialog>
   <input hidden id="image-input" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/bmp,video/mp4,video/webm,video/quicktime,video/x-matroska,.mkv,.mov">
   <input hidden id="project-input" type="file" accept=".d4a,application/json">
   <input hidden id="palette-input" type="file" accept=".json,.txt,.hex,.gpl">
@@ -256,6 +259,13 @@ function applySettings(value: Settings) {
   scheduleRender();
 }
 function renderAlgorithms() {
+  const search = $<HTMLInputElement>('style-search').value.trim().toLowerCase();
+  const select = $<HTMLSelectElement>('algorithm-select');
+  for (const option of select.options)
+    option.hidden =
+      option.value !== settings.algorithm &&
+      !!search &&
+      !option.textContent!.toLowerCase().includes(search);
   $<HTMLSelectElement>('algorithm-select').value = settings.algorithm;
   $('algorithm-description').textContent = algorithms.find((a) => a[0] === settings.algorithm)![3];
 }
@@ -340,7 +350,7 @@ function renderColors() {
           renderColors();
         }),
     );
-  $<HTMLButtonElement>('add-color').disabled = settings.palette.length >= 16;
+  $<HTMLButtonElement>('add-color').disabled = settings.palette.length >= 256;
 }
 function syncControls() {
   document.querySelectorAll<HTMLInputElement>('[data-setting]').forEach((el) => {
@@ -348,19 +358,35 @@ function syncControls() {
     el.value = String(value);
     $(`${el.id}-value`).textContent = `${Number(value.toFixed(2))}${el.dataset.suffix || ''}`;
   });
+  $<HTMLSelectElement>('working-space').value = settings.workingSpace;
+  $<HTMLSelectElement>('color-distance').value = settings.colorDistance;
+  $<HTMLSelectElement>('quantizer').value = settings.quantizer;
+  $<HTMLSelectElement>('matrix-rotation').value = String(settings.matrixRotation);
+  $<HTMLInputElement>('serpentine').checked =
+    settings.serpentine || settings.algorithm.endsWith('-serpentine');
+  $<HTMLInputElement>('serpentine').disabled = settings.algorithm.endsWith('-serpentine');
+  const group = algorithms.find((a) => a[0] === settings.algorithm)![2];
+  $('serpentine-row').hidden = !['Diffusion', 'Variable diffusion'].includes(group);
+  $('matrix-rotation-row').hidden = group !== 'Ordered';
+  $('matrix-step-controls').hidden = !settings.algorithm.startsWith('variable-');
+  $('history-controls').hidden = !settings.algorithm.startsWith('riemersma');
   $<HTMLInputElement>('invert').checked = settings.invert;
   $<HTMLInputElement>('seed').value = String(settings.seed);
   $<HTMLSelectElement>('color-mode').value = settings.colorMode;
   const cmyk = settings.algorithm === 'cmyk';
   $('cmyk-note').hidden = !cmyk;
-  $<HTMLSelectElement>('color-mode').disabled = cmyk;
+  $<HTMLSelectElement>('color-mode').disabled = cmyk || group === 'Tiles';
+  $<HTMLSelectElement>('working-space').disabled = cmyk;
+  $<HTMLSelectElement>('color-distance').disabled = cmyk || settings.colorMode === 'rgb';
   $('rgb-controls').hidden = cmyk || settings.colorMode !== 'rgb';
   $('palette-controls').hidden = cmyk || settings.colorMode === 'rgb';
   const pattern = algorithms.find((a) => a[0] === settings.algorithm)?.[2] === 'Pattern';
   $<HTMLInputElement>('patternSize').disabled = !pattern;
   $<HTMLInputElement>('patternSize').hidden = !pattern;
   document.querySelector<HTMLLabelElement>('label[for="patternSize"]')!.hidden = !pattern;
-  $<HTMLInputElement>('strength').disabled = cmyk || settings.algorithm === 'threshold';
+  $<HTMLInputElement>('strength').disabled =
+    cmyk || group === 'Tiles' || settings.algorithm === 'threshold';
+  $<HTMLInputElement>('jitter').disabled = cmyk || group === 'Tiles';
   $<HTMLInputElement>('threshold').disabled = cmyk;
   for (const id of ['patternSize', 'strength', 'threshold']) {
     document
@@ -679,8 +705,30 @@ document.querySelectorAll<HTMLDialogElement>('dialog').forEach((dialog) =>
     }
   }),
 );
+$<HTMLInputElement>('style-search').oninput = () => renderAlgorithms();
+for (const [id, key] of [
+  ['working-space', 'workingSpace'],
+  ['color-distance', 'colorDistance'],
+  ['quantizer', 'quantizer'],
+] as const) {
+  $<HTMLSelectElement>(id).onchange = () =>
+    change((s) => {
+      (s as unknown as Record<string, unknown>)[key] = $<HTMLSelectElement>(id).value;
+    });
+}
+$<HTMLSelectElement>('matrix-rotation').onchange = () =>
+  change((s) => {
+    s.matrixRotation = Number($<HTMLSelectElement>('matrix-rotation').value);
+  });
+$<HTMLInputElement>('serpentine').onchange = () =>
+  change((s) => {
+    s.serpentine = $<HTMLInputElement>('serpentine').checked;
+  });
 $<HTMLSelectElement>('algorithm-select').onchange = () =>
-  change((s) => (s.algorithm = $<HTMLSelectElement>('algorithm-select').value as AlgorithmId));
+  change((s) => {
+    s.algorithm = $<HTMLSelectElement>('algorithm-select').value as AlgorithmId;
+    if (s.algorithm.startsWith('tile-')) s.colorMode = 'palette';
+  });
 $<HTMLSelectElement>('builtin-preset').onchange = () => {
   const value = $<HTMLSelectElement>('builtin-preset').value;
   if (value !== 'custom') applySettings(builtinPresets[Number(value)].settings);
@@ -716,17 +764,42 @@ $<HTMLSelectElement>('palette-select').onchange = () => {
 $<HTMLSelectElement>('color-mode').onchange = () =>
   change((s) => (s.colorMode = $<HTMLSelectElement>('color-mode').value as Settings['colorMode']));
 bind('add-color', () => {
-  if (settings.palette.length < 16) change((s) => s.palette.push('#b9ca6b'));
+  if (settings.palette.length < 256) change((s) => s.palette.push('#b9ca6b'));
 });
-bind('extract', () =>
-  change(
-    (s) =>
-      (s.palette = extractPalette(
-        canvasPixels(sourceAtSize(256)).data,
-        +$<HTMLSelectElement>('extract-count').value,
-      )),
-  ),
-);
+let paletteJob = 0;
+bind('extract', async () => {
+  const button = $<HTMLButtonElement>('extract'),
+    snapshot = source,
+    job = ++paletteJob;
+  button.disabled = true;
+  button.textContent = 'Extracting…';
+  const pixels = canvasPixels(sourceAtSize(256)).data;
+  const worker = new Worker(new URL('./palette-worker.ts', import.meta.url), { type: 'module' });
+  try {
+    const colors = await new Promise<string[]>((resolve, reject) => {
+      worker.onmessage = ({ data }) =>
+        data.error ? reject(new Error(data.error)) : resolve(data.colors);
+      worker.onerror = () => reject(new Error('Palette extraction failed.'));
+      worker.postMessage(
+        {
+          pixels,
+          count: Number($<HTMLSelectElement>('extract-count').value),
+          method: settings.quantizer,
+        },
+        [pixels.buffer],
+      );
+    });
+    if (job === paletteJob && source === snapshot)
+      change((s) => {
+        s.palette = colors;
+        s.colorMode = 'palette';
+      });
+  } finally {
+    worker.terminate();
+    button.disabled = false;
+    button.textContent = 'Extract from image';
+  }
+});
 bind('import-palette', () => $('palette-input').click());
 bind('export-palette', () =>
   download(
@@ -779,6 +852,10 @@ $<HTMLInputElement>('image-input').onchange = (e) =>
     if (file) await loadImage(file, file.name);
     input.value = '';
   });
+$('canvas-frame').ondblclick = () => {
+  $<HTMLSelectElement>('zoom').value = 'fit';
+  updateZoom();
+};
 bind('sample', () => {
   motion.assertIdle();
   motion.reset();
@@ -825,6 +902,17 @@ document.addEventListener('keydown', (e) => {
     document.querySelector('dialog[open]')
   )
     return;
+  if (!e.ctrlKey && !e.metaKey && ['+', '=', '-', '.'].includes(e.key)) {
+    e.preventDefault();
+    const zoom = $<HTMLSelectElement>('zoom');
+    const values = ['fit', '50', '100', '200'];
+    zoom.value =
+      e.key === '.'
+        ? 'fit'
+        : values[Math.max(0, Math.min(3, values.indexOf(zoom.value) + (e.key === '-' ? -1 : 1)))];
+    updateZoom();
+    return;
+  }
   if (e.key.toLowerCase() === 'o' && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
     $('image-input').click();
