@@ -21,7 +21,7 @@ Requires Node.js 22.12+; Node.js 24 is used in CI.
 
 ## What you can make
 
-- **126 selectable styles:** 94 additions adapted from Ditherista/libdither, including blue noise, clustered/dispersed matrices, dot diffusion, binary tiles, Ostromoukhov/Zhou–Fang and Hilbert-curve Riemersma. The original 32 styles remain available. Now includes bounded DBS (7 formulas), all Lippens–Philips variants, all upstream curve definitions, grid and automatic thresholding. Search the style list; adjust contextual parameters. [Heavy-method limits](docs/performance-limits.md).
+- **126 selectable styles:** 94 additions adapted from Ditherista/libdither, including blue noise, clustered/dispersed matrices, dot diffusion, binary tiles, Ostromoukhov/Zhou–Fang and Hilbert-curve Riemersma. The original 32 styles remain available. Now includes bounded DBS (7 formulas), all Lippens–Philips variants, all upstream curve definitions, grid and automatic thresholding. Browse a searchable contact sheet with real sample thumbnails for every style; adjust contextual parameters. Previews render lazily in a separate worker and stay cached for the session. [Heavy-method limits](docs/performance-limits.md).
 - **24 stackable effects:** glow, bloom, chromatic aberration, RGB split, scanlines, grain, vignette, color adjustments, distortion, glitch, edge ink, and more. Toggle, reorder, or adjust up to 12 layers.
 - **Color:** 12 built-in palettes, editable 2–256-color palettes, median-cut/Wu/K-means/KD-tree extraction, RGB quantization, and JSON/hex/GIMP palette imports and exports.
 - **Color science:** classic sRGB or linear-light averaging/diffusion; weighted RGB, Euclidean RGB, CIELAB, CIEDE2000 or luminance-only palette matching. Existing recipes retain their classic defaults.

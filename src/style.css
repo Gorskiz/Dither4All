@@ -1227,3 +1227,78 @@ dialog > a {
   border-left: 2px solid var(--accent);
   padding-left: 8px;
 }
+
+/* Inline, bounded style contact sheet. Samples are cached in their tiny canvases. */
+.style-browser-heading {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 10px;
+  margin: 12px 0 7px;
+}
+.style-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  max-height: 256px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--canvas);
+}
+.style-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  padding: 4px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.style-card canvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  image-rendering: pixelated;
+  background: linear-gradient(135deg, #667163, #d2d5c6);
+}
+.style-card span {
+  font-size: 10px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.style-card[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.style-card:hover {
+  border-color: var(--accent);
+}
+.style-card:focus-visible {
+  outline-offset: 0;
+}
+.style-preview-note {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 7px 0 12px;
+}
+.style-preview-error {
+  position: absolute;
+  top: 8px;
+  left: 7px;
+  right: 7px;
+  font-size: 10px;
+  color: var(--ink);
+  background: var(--canvas);
+  padding: 3px;
+}
