@@ -21,9 +21,10 @@ Requires Node.js 22.12+; Node.js 24 is used in CI.
 
 ## What you can make
 
-- **32 dithering modes:** 15 error-diffusion modes (including three serpentine variants), five ordered matrices, nine pattern screens including CMYK, and three threshold/noise modes.
+- **96 selectable styles:** 64 additions adapted from Ditherista/libdither, including blue noise, clustered/dispersed matrices, dot diffusion, binary tiles, Ostromoukhov/Zhou–Fang and Hilbert-curve Riemersma. The original 32 styles remain available. Search the style list; adjust jitter, serpentine scanning and relevant matrix/curve parameters.
 - **24 stackable effects:** glow, bloom, chromatic aberration, RGB split, scanlines, grain, vignette, color adjustments, distortion, glitch, edge ink, and more. Toggle, reorder, or adjust up to 12 layers.
-- **Color:** 12 built-in palettes, editable 2–16-color palettes, median-cut extraction, RGB quantization, and JSON/hex/GIMP palette imports and exports.
+- **Color:** 12 built-in palettes, editable 2–256-color palettes, median-cut/Wu/K-means extraction, RGB quantization, and JSON/hex/GIMP palette imports and exports.
+- **Color science:** classic sRGB or linear-light averaging/diffusion; weighted RGB, Euclidean RGB, CIELAB, CIEDE2000 or luminance-only palette matching. Existing recipes retain their classic defaults.
 - **Image adjustments:** pixel scale, strength, threshold, pattern size, brightness, contrast, gamma, saturation, inversion, and a reproducible random seed.
 - **Workflow:** a continuous photo-editor inspector beside a persistent canvas, before/after comparison, zoom, undo/redo, drag and drop, clipboard paste/copy, five starting presets, saved browser presets, portable preset files, and settings links.
 - **Motion:** video import, silent playback, scrubbing, trim points, looping, adjustment keyframes, noise boil, brightness pulse, zoom and horizontal drift. Export MP4/WebM with optional source audio, animated GIF, or PNG frames in a ZIP. [Motion guide](docs/motion.md).
@@ -57,6 +58,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md), the [architecture](docs/architecture.md)
 
 ## License and independence
 
-Independent implementations of documented image-processing algorithms.
+Original implementations and attributed adaptations of documented image-processing algorithms. See the [Ditherista source audit](docs/ditherista-audit.md) for precisely what was adopted and what remains outside scope.
 
-App code and original procedural sample artwork: [MIT](LICENSE). Runtime media libraries retain their own licenses: Mediabunny (MPL-2.0) and gifenc (MIT). See [third-party notices](public/third-party-notices.txt). Build/test dependencies retain their own licenses. Public product demonstrations informed the feature categories; they do not establish implementation or exact output parity.
+Original app code and procedural sample artwork: [MIT](LICENSE). Runtime media libraries retain their own licenses: Mediabunny (MPL-2.0) and gifenc (MIT). Adapted libdither tables/methods retain Robert Kist’s BSD-style terms and bundled third-party notices; the blue-noise texture is Christoph Peters’ CC0 work. See [third-party notices](public/third-party-notices.txt). Build/test dependencies retain their own licenses. Public product demonstrations informed the feature categories; they do not establish implementation or exact output parity.

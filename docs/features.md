@@ -4,11 +4,11 @@ Feature scope for Dither4All's independent image editor. No application binary, 
 
 | Public feature category                         | Dither4All implementation                                                                                |
 | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Error diffusion                                 | 12 kernels plus 3 serpentine scanning variants                                                           |
-| Ordered dithering                               | Bayer 2/4/8/16 and a clustered-dot matrix                                                                |
+| Error diffusion                                 | Original 12 kernels/3 scanning variants, 7 more kernels, all-kernel serpentine/jitter controls           |
+| Ordered dithering                               | 43 matrix/screen styles including blue noise, Bayer 3/32, clustered/dispersed/magic screens              |
 | Pattern/halftone effects                        | Dots, horizontal/vertical/diagonal lines, crosshatch, rings, spiral, waves                               |
-| Full color and CMYK                             | Custom palettes, channel quantization, four rotated simulated ink screens                                |
-| Color extraction and shared palettes            | Median cut, editable swatches, JSON/hex/GPL import, JSON export                                          |
+| Full color and CMYK                             | Custom palettes, five distance metrics, linear/sRGB working spaces, RGB quantization and CMYK screens    |
+| Color extraction and shared palettes            | Median cut, Wu and K-means; 2–256 editable colors; JSON/hex/GPL import/export                            |
 | Stackable effects                               | 24 independent effect types, 12 layers, intensity, enable/disable, reorder                               |
 | Glow, chromatic aberration, glitch              | Original soft glow/bloom, channel shifts, displacements, compression-block approximation                 |
 | Image adjustments                               | Brightness, contrast, gamma, saturation, inversion, scale, strength, threshold                           |
@@ -21,3 +21,5 @@ Feature scope for Dither4All's independent image editor. No application binary, 
 
 This is feature-category coverage, not a claim of identical algorithms, equal counts, or pixel-perfect parity. Three serpentine entries are explicitly labeled variants, not newly invented algorithms. Compression blocks approximate a visual artifact; they do not corrupt actual JPEG bitstreams. CMYK is an RGB display simulation, not a color-managed print separation workflow.
 
+
+Ditherista/libdither additions and source/license details are tracked in [the source audit](ditherista-audit.md). The 96-style count includes matrix variants and the three legacy serpentine aliases; it is not a count of 96 unrelated algorithms.

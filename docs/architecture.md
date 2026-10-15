@@ -6,11 +6,11 @@ Vite builds TypeScript and CSS into a static application. Mediabunny and gifenc 
 
 `src/main.ts` owns editor state, bounded settings history, file operations, dialogs, and browser-local saved presets. `src/engine/catalog.ts` defines typed settings, effect identifiers, defaults, diffusion kernels, palettes, and strict import validation.
 
-`src/engine/process.ts` is a pure typed-array pipeline:
+`src/engine/process.ts` is a pure typed-array pipeline (sRGB by default; optional linear-light processing):
 
-1. Area-average source pixels to the selected pixel scale, weighting RGB by opacity.
+1. Area-average source pixels to the selected pixel scale, weighting RGB by opacity and optionally decoding to linear light first.
 2. Apply saturation, contrast, brightness, gamma, and source inversion.
-3. Dither against a fixed palette or quantize RGB channels. CMYK uses its own source-color screens.
+3. Dither against a fixed palette or quantize RGB channels. Family-specific dot/tile/Hilbert methods use the same prepared pixels and palette matcher. Re-encode linear output to sRGB. CMYK uses its own source-color screens.
 4. Apply enabled effects in stack order on the pixel grid.
 5. Expand the grid by nearest neighbor to the exact source dimensions. Restore each original alpha value.
 
@@ -42,3 +42,11 @@ Batch snapshots the settings at its start, decodes one image at a time, and coll
 GIF quantization and encoding run in a separate worker (`gif-worker.ts`). GIF delays distribute centiseconds across frames to preserve total timing. PNG ZIPs include sequentially named frames and timing metadata. Export uses settings/timeline snapshots; source replacement is blocked while exporting. Limits bound retained output (120 MB for GIF/PNG sequences), duration, frame count and dimensions. Memory availability still varies by device; output is collected in memory before download.
 
 Projects retain v1 compatibility, with optional validated motion metadata. Stills embed the original image; video projects embed a poster and original filename/size reference. They require relinking the original video after reopening. No original video is embedded or uploaded.
+
+## Additional dithering and color tools
+
+`src/engine/ditherista/catalog.ts` contains small UI metadata; numeric tables live separately in `data.ts` and are imported by the processing worker only. `process.ts` in that directory implements the additional families without DOM dependencies. Tables are pinned to the audited upstream revision and regenerated from source using `scripts/import-ditherista.py`.
+
+`perceptual.ts` converts sRGB/linear RGB to D65 CIELAB and creates a matcher that precomputes palette coordinates once per image. CIEDE2000 is intentionally labeled slower. `quantization.ts` implements bounded Wu and deterministic K-means extraction alongside the existing median cut. A dedicated `palette-worker.ts` keeps extraction off the UI thread; stale results are discarded when the source changes.
+
+Optional new recipe fields receive classic defaults when missing; invalid supplied values are rejected. Projects, saved presets, settings links, batch exports and video exports share the same validated Settings contract. Palettes can contain up to 256 colors. Large perceptual palettes can be expensive in motion previews; the preview remains adaptive and exports render every frame.
