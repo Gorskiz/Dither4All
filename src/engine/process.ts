@@ -67,7 +67,7 @@ function cmyk(r: number, g: number, b: number, x: number, y: number, size: numbe
     const v = ((x * Math.sin(a) + y * Math.cos(a)) / size) % 1;
     const dx = ((u + 1) % 1) - 0.5,
       dy = ((v + 1) % 1) - 0.5;
-    return Math.PI * (dx * dx + dy * dy) < ink ? 1 : 0;
+    return ink >= 1 || Math.PI * (dx * dx + dy * dy) < ink ? 1 : 0;
   });
   return [
     255 * (1 - dots[0]) * (1 - dots[3]),

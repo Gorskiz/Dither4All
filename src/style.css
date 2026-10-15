@@ -323,7 +323,7 @@ h1 span {
 }
 .panel-index {
   font-size: 8px;
-  color: #8b9084;
+  color: var(--muted);
 }
 .tabs {
   display: flex;
@@ -719,7 +719,7 @@ select option {
   padding: 6px 9px;
   border-radius: 2px;
   font-size: 9px;
-  color: #737b68;
+  color: var(--muted);
 }
 .view-modes button[aria-pressed='true'] {
   background: var(--panel);
@@ -778,7 +778,7 @@ select option {
   gap: 12px;
   font-size: 7px;
   letter-spacing: 0.8px;
-  color: #78816c;
+  color: var(--muted);
   width: 100%;
   margin-top: 16px;
   max-width: 660px;
@@ -875,7 +875,7 @@ kbd {
   justify-content: space-between;
   gap: 8px;
   font-size: 7px;
-  color: #768069;
+  color: var(--muted);
   padding: 11px 18px;
   border-top: 1px solid #bac2ab80;
   min-height: 34px;
@@ -961,7 +961,7 @@ kbd {
 }
 .empty-stack > span {
   font-size: 8px;
-  color: #969d89;
+  color: var(--muted);
   margin-top: 7px;
 }
 .effect-layer {
@@ -1166,7 +1166,7 @@ kbd {
 }
 .site-footer p span {
   margin-left: 10px;
-  color: #93998a;
+  color: var(--muted);
 }
 .site-footer > div {
   display: flex;
