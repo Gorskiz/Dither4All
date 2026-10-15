@@ -658,6 +658,12 @@ const motion = new MotionEditor({
     $('image-name').textContent = name;
   },
   renderStill: scheduleRender,
+  cancelStill: () => {
+    clearTimeout(renderTimer);
+    ++renderVersion;
+    previewAbort?.abort();
+    previewAbort = null;
+  },
   zoom: updateZoom,
   toast,
   error: fail,

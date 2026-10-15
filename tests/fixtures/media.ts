@@ -54,3 +54,17 @@ export async function inspectVideo(bytes: number[]) {
     input.dispose();
   }
 }
+
+export async function supportsFormat(format: 'mp4' | 'webm') {
+  return (
+    (await m.canEncodeVideo(format === 'mp4' ? 'avc' : 'vp8', {
+      width: 160,
+      height: 120,
+      frameRate: 12,
+    })) &&
+    (await m.canEncodeAudio(format === 'mp4' ? 'aac' : 'opus', {
+      numberOfChannels: 1,
+      sampleRate: 48000,
+    }))
+  );
+}

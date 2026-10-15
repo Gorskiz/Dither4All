@@ -30,6 +30,7 @@ interface Host {
   source: () => HTMLCanvasElement;
   setSource: (canvas: HTMLCanvasElement, name: string) => void;
   renderStill: () => void;
+  cancelStill: () => void;
   zoom: () => void;
   toast: (message: string) => void;
   error: (error: unknown) => void;
@@ -186,6 +187,7 @@ export class MotionEditor {
     this.visible();
   }
   private visible() {
+    if (this.active) this.host.cancelStill();
     el('timeline').hidden = !this.active;
     el('motion-section').hidden = !this.active;
     el('animate-image').hidden = this.active;

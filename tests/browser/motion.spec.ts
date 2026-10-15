@@ -27,9 +27,9 @@ test('still animation scrubs, keyframes, plays, cancels and exports GIF/PNG sequ
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
-  await expect(page.locator('#render-status')).toContainText('ms');
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await expect(page.locator('#timeline')).toBeVisible();
+  await expect(page.locator('#render-status')).toContainText('Motion preview');
   await page.getByLabel('Duration (s)', { exact: true }).fill('1');
   await page.getByLabel('Duration (s)', { exact: true }).press('Tab');
   await page.getByLabel('FPS', { exact: true }).selectOption('6');
@@ -103,6 +103,16 @@ test('video import, trim, keyframe project relink, and audio-preserving MP4/WebM
   await expect(page.locator('#motion-time')).toContainText('00:01.00');
   for (const format of ['mp4', 'webm']) {
     await page.getByLabel('Motion format', { exact: true }).selectOption(format);
+    const supported = await page.evaluate(async (format) => {
+      const path = '/tests/fixtures/media.ts';
+      return (await import(/* @vite-ignore */ path)).supportsFormat(format);
+    }, format);
+    if (!supported) {
+      await page.getByRole('button', { name: 'Export animation', exact: true }).click();
+      await expect(page.locator('#motion-export-status')).toHaveText('Export failed.');
+      await expect(page.locator('#toast')).toContainText('unavailable');
+      continue;
+    }
     const dl = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export animation', exact: true }).click();
     const blob = await readFile((await (await dl).path())!);
