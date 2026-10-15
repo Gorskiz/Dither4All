@@ -21,7 +21,6 @@ Feature scope for Dither4All's independent image editor. No application binary, 
 
 This is feature-category coverage, not a claim of identical algorithms, equal counts, or pixel-perfect parity. Three serpentine entries are explicitly labeled variants, not newly invented algorithms. Compression blocks approximate a visual artifact; they do not corrupt actual JPEG bitstreams. CMYK is an RGB display simulation, not a color-managed print separation workflow.
 
-
 Ditherista/libdither additions and source/license details are tracked in [the source audit](ditherista-audit.md). The 126-style count includes matrix variants and the three legacy serpentine aliases; it is not a count of 96 unrelated algorithms.
 
 All remaining native dithering families are included in version 0.4: DBS, Lippens–Philips, remaining curves, grid and automatic threshold. See [resource limits](performance-limits.md). Four palette extractors now include KD-tree refinement.
