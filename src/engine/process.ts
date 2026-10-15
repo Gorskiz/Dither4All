@@ -1,5 +1,14 @@
+import { paletteMatcher, srgbToLinear, linearToSrgb } from './perceptual';
+import {
+  matrixScreen,
+  allebachScreen,
+  advancedDither,
+  extraKernels,
+  variableKernel,
+  zhouOffset,
+} from './ditherista/process';
 import { kernels, type RGB, type Settings } from './catalog';
-import { clamp, hexRGB, luminance, nearest, noise } from './color';
+import { clamp, hexRGB, luminance, noise } from './color';
 import { applyEffects } from './effects';
 export interface Pixels {
   width: number;
@@ -16,6 +25,25 @@ function bayer(x: number, y: number, size: number): number {
   return (value + 0.5) / (size * size);
 }
 function screen(x: number, y: number, s: Settings): number {
+  const matrix = matrixScreen(s.algorithm, x, y, s);
+  if (matrix !== null) return matrix;
+  if (s.algorithm.startsWith('bayer-') || s.algorithm === 'clustered') {
+    const n = s.algorithm === 'clustered' ? 4 : Number(s.algorithm.split('-')[1]);
+    let u = x,
+      v = y;
+    if (s.matrixRotation === 90) {
+      u = -y;
+      v = x;
+    } else if (s.matrixRotation === 180) {
+      u = -x;
+      v = -y;
+    } else if (s.matrixRotation === 270) {
+      u = y;
+      v = -x;
+    }
+    x = ((u % n) + n) % n;
+    y = ((v % n) + n) % n;
+  }
   const n = s.patternSize,
     u = x / n,
     v = y / n,
@@ -82,7 +110,15 @@ export function processImage(input: Pixels, s: Settings): Pixels {
     height = Math.ceil(input.height / scale);
   const work = new Float32Array(width * height * 3),
     alpha = new Uint8Array(width * height);
+  // Variable diffusion selects coefficients from the unmodified source tone,
+  // rather than from the accumulated diffusion error.
+  const sourceLevels = ['ostromoukhov', 'zhou-fang'].includes(s.algorithm)
+    ? new Uint8Array(width * height)
+    : null;
   const contrast = (100 + s.contrast) / 100;
+  const linear = s.workingSpace === 'linear' && s.algorithm !== 'cmyk';
+  const decode = linear ? srgbToLinear : (v: number) => v;
+  const encode = (c: RGB): RGB => (linear ? (c.map(linearToSrgb) as RGB) : c);
   // Area averaging avoids the aliasing of point sampling when pixel scale increases.
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
@@ -95,9 +131,9 @@ export function processImage(input: Pixels, s: Settings): Pixels {
         for (let xx = x * scale; xx < Math.min((x + 1) * scale, input.width); xx++) {
           const p = (yy * input.width + xx) * 4,
             opacity = input.data[p + 3] / 255;
-          r += input.data[p] * opacity;
-          g += input.data[p + 1] * opacity;
-          b += input.data[p + 2] * opacity;
+          r += decode(input.data[p]) * opacity;
+          g += decode(input.data[p + 1]) * opacity;
+          b += decode(input.data[p + 2]) * opacity;
           a += opacity;
           samples++;
         }
@@ -115,51 +151,65 @@ export function processImage(input: Pixels, s: Settings): Pixels {
         work[p + c] = s.invert ? 255 - v : v;
       }
       alpha[y * width + x] = Math.round((a / samples) * 255);
+      if (sourceLevels)
+        sourceLevels[y * width + x] = Math.round(luminance(work[p], work[p + 1], work[p + 2]));
     }
-  const palette = s.palette.map(hexRGB),
-    output = new Uint8ClampedArray(width * height * 4);
-  const serpentine = s.algorithm.endsWith('-serpentine');
-  const kernel = kernels[s.algorithm.replace('-serpentine', '')];
+  const palette = s.palette.map(hexRGB);
+  const match = paletteMatcher(palette, { ...s, workingSpace: linear ? 'linear' : 'srgb' });
+  const serpentine = s.serpentine || s.algorithm.endsWith('-serpentine');
+  const fixedKernel = kernels[s.algorithm.replace('-serpentine', '')] || extraKernels[s.algorithm];
+  const allebach =
+    s.algorithm === 'kacker-allebach'
+      ? allebachScreen(width, height, s.seed, s.matrixRotation)
+      : null;
   const quantize = (r: number, g: number, b: number): RGB =>
     s.colorMode === 'rgb'
       ? ([r, g, b].map(
           (v) => (Math.round((clamp(v) / 255) * (s.levels - 1)) * 255) / (s.levels - 1),
         ) as RGB)
-      : nearest(r, g, b, palette);
-  for (let y = 0; y < height; y++) {
-    const reverse = serpentine && y % 2 === 1;
-    for (let step = 0; step < width; step++) {
-      const x = reverse ? width - 1 - step : step,
-        p = (y * width + x) * 3,
-        q = (y * width + x) * 4;
-      const r = work[p],
-        g = work[p + 1],
-        b = work[p + 2];
-      const thresholdOffset = (50 - s.threshold) * 2.55;
-      const delta =
-        kernel || s.algorithm === 'threshold'
-          ? 0
-          : ((screen(x, y, s) - 0.5) * 255 * s.strength) / 100;
-      const color =
-        s.algorithm === 'cmyk'
-          ? cmyk(clamp(r), clamp(g), clamp(b), x, y, s.patternSize)
-          : quantize(
-              r + delta + thresholdOffset,
-              g + delta + thresholdOffset,
-              b + delta + thresholdOffset,
-            );
-      output.set([...color, alpha[y * width + x]], q);
-      if (kernel && alpha[y * width + x] > 0)
-        for (const [dx, dy, weight] of kernel) {
-          const nx = x + (reverse ? -dx : dx),
-            ny = y + dy;
-          if (nx < 0 || nx >= width || ny >= height || alpha[ny * width + nx] === 0) continue;
-          const dest = (ny * width + nx) * 3;
-          for (let c = 0; c < 3; c++)
-            work[dest + c] += ((work[p + c] - color[c]) * weight * s.strength) / 100;
-        }
+      : match(r, g, b);
+  const special = advancedDither(work, alpha, width, height, s, quantize, encode);
+  const output = special || new Uint8ClampedArray(width * height * 4);
+  if (!special)
+    for (let y = 0; y < height; y++) {
+      const reverse = serpentine && y % 2 === 1;
+      for (let step = 0; step < width; step++) {
+        const x = reverse ? width - 1 - step : step,
+          p = (y * width + x) * 3,
+          q = (y * width + x) * 4;
+        const r = work[p],
+          g = work[p + 1],
+          b = work[p + 2];
+        const level = sourceLevels?.[y * width + x] ?? 0;
+        const kernel = fixedKernel || variableKernel(s.algorithm, level);
+        const thresholdOffset =
+          (50 - s.threshold) * 2.55 +
+          (noise(x, y, s.seed) - 0.5) * s.jitter * 2.55 +
+          (s.algorithm === 'zhou-fang' ? zhouOffset(level, x, y, s.seed) : 0);
+        const delta =
+          kernel || s.algorithm === 'threshold'
+            ? 0
+            : (((allebach ? allebach(x, y) : screen(x, y, s)) - 0.5) * 255 * s.strength) / 100;
+        const color =
+          s.algorithm === 'cmyk'
+            ? cmyk(clamp(r), clamp(g), clamp(b), x, y, s.patternSize)
+            : quantize(
+                r + delta + thresholdOffset,
+                g + delta + thresholdOffset,
+                b + delta + thresholdOffset,
+              );
+        output.set([...encode(color), alpha[y * width + x]], q);
+        if (kernel && alpha[y * width + x] > 0)
+          for (const [dx, dy, weight] of kernel) {
+            const nx = x + (reverse ? -dx : dx),
+              ny = y + dy;
+            if (nx < 0 || nx >= width || ny >= height || alpha[ny * width + nx] === 0) continue;
+            const dest = (ny * width + nx) * 3;
+            for (let c = 0; c < 3; c++)
+              work[dest + c] += ((work[p + c] - color[c]) * weight * s.strength) / 100;
+          }
+      }
     }
-  }
   const effected = applyEffects({ width, height, data: output }, s.effects, s.seed);
   if (scale === 1) return effected;
   const full = new Uint8ClampedArray(input.width * input.height * 4);

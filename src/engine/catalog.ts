@@ -1,3 +1,4 @@
+import { additionalAlgorithms } from './ditherista/catalog';
 export type RGB = [number, number, number];
 export type Kernel = readonly (readonly [number, number, number])[];
 export const kernels: Record<string, Kernel> = {
@@ -174,6 +175,7 @@ export const algorithms = [
     'Other',
     'A compact, deterministic spatial noise screen.',
   ],
+  ...additionalAlgorithms,
 ] as const;
 export type AlgorithmId = (typeof algorithms)[number][0];
 export const effectCatalog = [
@@ -211,6 +213,14 @@ export interface Effect {
 }
 export interface Settings {
   algorithm: AlgorithmId;
+  workingSpace: 'srgb' | 'linear';
+  colorDistance: 'weighted-rgb' | 'rgb' | 'lab' | 'ciede2000' | 'luminance';
+  quantizer: 'median-cut' | 'wu' | 'kmeans';
+  serpentine: boolean;
+  jitter: number;
+  matrixRotation: number;
+  matrixStep: number;
+  errorHistory: number;
   scale: number;
   strength: number;
   brightness: number;
@@ -228,6 +238,14 @@ export interface Settings {
 }
 export const defaults: Settings = {
   algorithm: 'floyd-steinberg',
+  workingSpace: 'srgb',
+  colorDistance: 'weighted-rgb',
+  quantizer: 'median-cut',
+  serpentine: false,
+  jitter: 0,
+  matrixRotation: 0,
+  matrixStep: 16,
+  errorHistory: 16,
   scale: 2,
   strength: 100,
   brightness: 0,
@@ -280,6 +298,37 @@ export function validateSettings(value: unknown): Settings {
   if (!algorithms.some((a) => a[0] === s.algorithm))
     throw new Error('Unknown dithering algorithm.');
   result.algorithm = s.algorithm as AlgorithmId;
+  // Older recipes omit these fields. New values remain strictly validated.
+  for (const [key, values] of Object.entries({
+    workingSpace: ['srgb', 'linear'],
+    colorDistance: ['weighted-rgb', 'rgb', 'lab', 'ciede2000', 'luminance'],
+    quantizer: ['median-cut', 'wu', 'kmeans'],
+  })) {
+    if (s[key] === undefined) continue;
+    if (typeof s[key] !== 'string' || !values.includes(s[key] as string))
+      throw new Error(`Invalid ${key} setting.`);
+    (result as unknown as Record<string, unknown>)[key] = s[key];
+  }
+  if (s.serpentine !== undefined && typeof s.serpentine !== 'boolean')
+    throw new Error('Invalid serpentine setting.');
+  result.serpentine = s.serpentine === true;
+  for (const [key, lo, hi] of [
+    ['jitter', 0, 100],
+    ['matrixStep', 1, 128],
+    ['errorHistory', 4, 64],
+  ] as const) {
+    const value = s[key];
+    if (value === undefined) continue;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < lo || value > hi)
+      throw new Error(`Invalid ${key} setting.`);
+    result[key] = value;
+  }
+  if (s.matrixRotation !== undefined) {
+    if (![0, 90, 180, 270].includes(s.matrixRotation as number))
+      throw new Error('Invalid matrix rotation.');
+    result.matrixRotation = s.matrixRotation as number;
+  }
+
   const bounds: Record<string, [number, number]> = {
     scale: [1, 16],
     strength: [0, 150],
@@ -301,10 +350,10 @@ export function validateSettings(value: unknown): Settings {
   if (
     !Array.isArray(s.palette) ||
     s.palette.length < 2 ||
-    s.palette.length > 16 ||
+    s.palette.length > 256 ||
     !s.palette.every((c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c))
   )
-    throw new Error('Palettes need 2–16 six-digit hex colors.');
+    throw new Error('Palettes need 2–256 six-digit hex colors.');
   result.palette = [...s.palette];
   if (s.colorMode !== 'palette' && s.colorMode !== 'rgb') throw new Error('Invalid color mode.');
   result.colorMode = s.colorMode;

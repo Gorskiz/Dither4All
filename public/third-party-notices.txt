@@ -15,3 +15,16 @@ License: MIT, ./licenses/gifenc-MIT.txt
 Source: https://www.npmjs.com/package/gifenc/v/1.0.3
 https://github.com/mattdesl/gifenc
 Loaded in a local worker for GIF export.
+
+Ditherista / libdither adaptations:
+Ditherista (MIT), ./licenses/ditherista-MIT.txt
+https://github.com/robertkist/ditherista
+libdither, Copyright (C) 2022-2025 Robert Kist, BSD-style license with notice requirements.
+Source revision: 7bf49c5324b8b8d5ce321d549f89fb6c75a9d859
+https://github.com/robertkist/libdither/tree/7bf49c5324b8b8d5ce321d549f89fb6c75a9d859
+License: ./licenses/libdither.txt
+Required bundled notices and upstream credits: ./licenses/libdither-additional.txt
+Adapted numeric threshold/class/tile tables and variable-error coefficients are in
+src/engine/ditherista/data.ts; TypeScript algorithms are modified browser adaptations.
+The blue-noise threshold texture is by Christoph Peters, CC0 1.0, via libdither.
+No Ditherista GUI, Qt code, icons, example artwork, kdtree or uthash implementation is shipped.

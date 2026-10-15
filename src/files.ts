@@ -173,10 +173,10 @@ export function parsePalette(text: string): string[] {
   if (
     !Array.isArray(colors) ||
     colors.length < 2 ||
-    colors.length > 16 ||
+    colors.length > 256 ||
     !colors.every((c) => typeof c === 'string' && /^#[a-f0-9]{6}$/i.test(c))
   )
-    throw new Error('Import 2–16 colors as hex text, palette JSON, or a GIMP .gpl file.');
+    throw new Error('Import 2–256 colors as hex text, palette JSON, or a GIMP .gpl file.');
   return colors;
 }
 // ZIP "store" entries: no compression dependency, predictable memory usage.
