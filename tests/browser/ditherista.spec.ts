@@ -20,7 +20,18 @@ test('expanded styles, perceptual controls, worker palette extraction and portab
   await page.getByLabel('Extract', { exact: true }).selectOption('wu');
   await page.getByLabel('Number of extracted colors').selectOption('32');
   await page.getByRole('button', { name: 'Extract from image', exact: true }).click();
-  await expect(page.locator('#palette-colors input')).toHaveCount(32);
+  // Extraction returns up to the requested count after duplicate colors are removed.
+  // Canvas gradients/resampling vary across platforms, so the sample may yield 31 or 32.
+  await expect(page.getByLabel('Palette', { exact: true })).toHaveValue('custom');
+  await expect(page.getByRole('button', { name: 'Extract from image', exact: true })).toBeEnabled();
+  const extracted = await page
+    .locator('#palette-colors input')
+    .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value));
+  expect(extracted.length).toBeGreaterThan(2);
+  expect(extracted.length).toBeLessThanOrEqual(32);
+  expect(new Set(extracted).size).toBe(extracted.length);
+  expect(extracted.every((color) => /^#[0-9a-f]{6}$/i.test(color))).toBe(true);
+  await expect(page.locator('#palette-count')).toHaveText(`${extracted.length} colors`);
   await page.getByLabel('Style', { exact: true }).selectOption('ostromoukhov');
   await page.getByLabel('Serpentine scan', { exact: true }).check();
   await page.getByLabel('Jitter', { exact: true }).fill('25');
@@ -35,6 +46,7 @@ test('expanded styles, perceptual controls, worker palette extraction and portab
     workingSpace: 'linear',
     colorDistance: 'lab',
     quantizer: 'wu',
+    palette: extracted,
     serpentine: true,
     jitter: 25,
   });

@@ -178,6 +178,16 @@ describe('color science and quantizers', () => {
       for (let i = 0; i < result.data.length; i += 4) expect([128, 188]).toContain(result.data[i]);
     }
   });
+  it('treats requested palette size as a ceiling when the source has fewer unique colors', () => {
+    const data = new Uint8ClampedArray(
+      Array.from({ length: 64 }, (_, i) =>
+        i % 2 ? [240, 20, 30, 255] : [20, 30, 240, 255],
+      ).flat(),
+    );
+    for (const method of ['median-cut', 'wu', 'kmeans', 'kdtree'] as const) {
+      expect(quantizePalette(data, 32, method)).toEqual(['#141ef0', '#f0141e']);
+    }
+  });
   it('extracts representative colors with all three methods without transparency contamination', () => {
     const data = new Uint8ClampedArray(
       Array.from({ length: 90 }, (_, i) =>
