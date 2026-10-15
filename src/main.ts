@@ -59,12 +59,13 @@ const slider = (id: string, label: string, min: number, max: number, step = 1, s
 $('app').innerHTML = `
   <header class="site-header">
     <a class="brand" href="./" aria-label="Dither4All home"><span class="brand-mark" aria-hidden="true">D<span>4</span></span><span>DITHER<span class="brand-four">4</span>ALL<span class="brand-sub">FREE ONLINE DITHER</span></span></a>
-    <nav class="header-links" aria-label="Main navigation"><button id="help-open" class="text-button">The field guide <span>↗</span></button><a href="https://github.com/Gorskiz/Dither4All" target="_blank" rel="noopener noreferrer">${icon('github')} <span>Open source</span> ↗</a></nav>
+    <nav class="header-links" aria-label="Main navigation"><button id="help-open" class="text-button">Guide</button><button id="about-open" class="text-button">About & privacy</button><a href="https://github.com/Gorskiz/Dither4All" aria-label="Dither4All on GitHub" target="_blank" rel="noopener noreferrer">${icon('github')} <span>Open source</span> ↗</a></nav>
   </header>
   <main>
-    <section class="intro" aria-labelledby="intro-title"><div><p class="eyebrow"><span class="live-dot"></span> THE INTERNET NEEDS MORE TEXTURE.</p><h1 id="intro-title">Less color. <span>More character.</span></h1><p class="intro-copy">An image playground for dots, happy accidents, and beautiful limitations.</p></div><div class="free-stamp"><span>100%</span>FREE. FOREVER.<i>✳</i></div></section>
-    <section class="studio" aria-label="Image editor">
+    <h1 class="sr-only">Dither4All image editor</h1>
+    <section class="studio" aria-label="Image editor" data-workspace="image">
       <div class="studio-menu"><div class="menu-start"><span class="workspace-dot"></span><span class="mono">THE WORKSHOP</span><span class="version">v0.1</span></div><div class="project-actions"><button id="open-project">Open project</button><button id="save-project">Save project</button><button id="batch-open">Batch images</button><button id="fullscreen" class="icon-button" aria-label="Toggle fullscreen">${icon('expand')}</button></div></div>
+      <nav class="workspace-tabs" aria-label="Editor workspace"><button data-workspace="image" aria-pressed="true">Image</button><button data-workspace="controls" aria-pressed="false">Dither & color</button><button data-workspace="output" aria-pressed="false">Effects & export</button></nav>
       <div class="editor-layout">
         <aside class="controls-panel" aria-label="Image controls">
           <div class="panel-heading"><span>MAKE IT YOURS</span><span class="panel-index">01—03</span></div>
@@ -109,9 +110,8 @@ $('app').innerHTML = `
           <button id="reset" class="reset-button">Reset everything ↺</button>
         </aside>
       </div>
-      <div class="preset-bar"><div class="preset-intro"><span class="eyebrow">SKIP THE BLANK CANVAS</span><h2>A few starting points<span>↗</span></h2><button id="shuffle" class="small-link">${icon('shuffle')} Surprise me</button></div><div id="preset-gallery" class="preset-gallery"></div></div>
+      <details class="preset-drawer"><summary>Presets <span>5 starting points</span></summary><div class="preset-bar"><div class="preset-intro"><h2>Starting points</h2><button id="shuffle" class="small-link">${icon('shuffle')} Surprise me</button></div><div id="preset-gallery" class="preset-gallery"></div></div></details>
     </section>
-    <footer class="site-footer"><p>Made for making things. <span>No accounts. No uploads. No nonsense.</span></p><div><button id="about-open">About & privacy</button><a href="https://github.com/Gorskiz/Dither4All" target="_blank" rel="noopener noreferrer">MIT licensed ↗</a></div></footer>
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <dialog id="effect-dialog" aria-labelledby="effect-dialog-title"><form method="dialog" class="dialog-header"><div><p class="eyebrow">ONE MORE LAYER</p><h2 id="effect-dialog-title">Find your finishing touch.</h2></div><button class="icon-button" aria-label="Close effects">${icon('close')}</button></form><p>Effects run after dithering, from top to bottom. They can introduce new colors.</p><div id="effect-picker" class="effect-picker"></div></dialog>
@@ -513,8 +513,9 @@ function updateSplit() {
 function updateZoom() {
   const value = $<HTMLSelectElement>('zoom').value,
     stage = $('drop-zone');
-  const availableW = Math.max(180, stage.clientWidth - 64),
-    availableH = Math.max(150, stage.clientHeight - 90);
+  if (!stage.clientWidth || !stage.clientHeight) return;
+  const availableW = Math.max(1, stage.clientWidth - 64),
+    availableH = Math.max(1, stage.clientHeight - 90);
   const width =
     value === 'fit'
       ? Math.min(availableW, (availableH * source.width) / source.height)
@@ -639,10 +640,22 @@ function renderPresetGallery() {
       (el) =>
         (el.onclick = () => {
           applySettings(builtinPresets[+el.dataset.preset!].settings);
+          selectWorkspace('image');
           toast(`Loaded “${builtinPresets[+el.dataset.preset!].name}”.`);
         }),
     );
 }
+function selectWorkspace(value: string) {
+  document.querySelector<HTMLElement>('.studio')!.dataset.workspace = value;
+  document.querySelectorAll<HTMLButtonElement>('.workspace-tabs button').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.workspace === value));
+  });
+  requestAnimationFrame(updateZoom);
+}
+document.querySelectorAll<HTMLButtonElement>('.workspace-tabs button').forEach((button) => {
+  button.onclick = () => selectWorkspace(button.dataset.workspace!);
+});
+
 function openDialog(id: string) {
   $<HTMLDialogElement>(id).showModal();
 }

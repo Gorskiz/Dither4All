@@ -70,6 +70,7 @@ test('project round trip, malformed input, palette import, and image batch', asy
   await page.getByRole('button', { name: 'Save project', exact: true }).click();
   const file = await saved,
     projectPath = await file.path();
+  await page.locator('.preset-drawer > summary').click();
   await page.getByRole('button', { name: 'Signal lost', exact: false }).click();
   await expect(page.locator('.effect-layer')).toHaveCount(2);
   await page.locator('#project-input').setInputFiles(projectPath!);
@@ -138,8 +139,56 @@ test('mobile layout stays within viewport and dialogs remain usable', async ({ p
   await page.goto('/');
   await expect(page.locator('#render-status')).toContainText('ms');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.getByRole('button', { name: 'Effects & export', exact: true }).click();
   await page.getByRole('button', { name: 'Add an effect', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: 'Close effects', exact: true }).click();
+  await page.getByRole('button', { name: 'Image', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Image', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('button', { name: 'Effects & export', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
   await page.screenshot({ path: 'test-results/editor-mobile.png', fullPage: true });
+});
+
+test('workspace fills the viewport and keeps panels usable when resized', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#render-status')).toContainText('ms');
+  for (const [width, height] of [
+    [1920, 1080],
+    [1440, 900],
+    [1440, 600],
+    [1024, 768],
+    [820, 900],
+    [390, 844],
+  ]) {
+    await page.setViewportSize({ width, height });
+    const bounds = await page.locator('.studio').boundingBox();
+    expect(bounds!.x).toBe(0);
+    expect(bounds!.width).toBe(width);
+    expect(Math.round(bounds!.y + bounds!.height)).toBe(height);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(
+      height,
+    );
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+    if (width >= 1200) {
+      const first = await page.getByRole('button', { name: 'All', exact: true }).boundingBox();
+      const last = await page.getByRole('button', { name: 'Other', exact: true }).boundingBox();
+      expect(first!.y).toBe(last!.y);
+    }
+    if (width <= 1000) {
+      await page.getByRole('button', { name: 'Dither & color', exact: true }).click();
+      await expect(page.getByRole('tab', { name: 'Dither', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Effects & export', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Export image', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Image', exact: true }).click();
+    }
+    await expect(page.locator('#output-canvas')).toBeVisible();
+  }
 });
