@@ -1484,3 +1484,16 @@ dialog > a {
   width: 100%;
   margin: 6px 0;
 }
+
+.motion-preset-lock[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.motion-preset-direction {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.motion-preset-direction .toggle-row {
+  flex: 1;
+}

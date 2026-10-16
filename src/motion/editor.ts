@@ -88,6 +88,7 @@ export class MotionEditor {
   private presetSpeed = 1;
   private presetReverse = false;
   private presetPhase = 0;
+  private presetLocks = { strength: false, speed: false, phase: false, direction: false };
   private importingPresets = false;
   private savedMotionPresets: SavedMotionPreset[] = [];
   private presetEdit: { kind: 'save' } | { kind: 'rename'; id: string } | null = null;
@@ -112,17 +113,18 @@ export class MotionEditor {
         <p class="hint">Export a selection up to 30 seconds. Preview adapts to your device.</p>
         <div class="section-title motion-subheading"><h3>Animation looks</h3><button id="motion-preview-toggle" class="small-link" type="button">Pause previews</button></div>
         <p class="hint" id="motion-preview-source-note">Uses your current image and image settings for all preset previews.</p>
-        <div class="field-row motion-preset-strength"><label for="motion-preset-strength">Preset strength</label><output id="motion-preset-strength-value" for="motion-preset-strength">100%</output><button id="motion-preset-strength-reset" class="small-link" type="button" aria-label="Reset preset strength">Reset</button></div>
+        <div class="field-row motion-preset-strength"><label for="motion-preset-strength">Preset strength</label><output id="motion-preset-strength-value" for="motion-preset-strength">100%</output><button id="motion-preset-strength-reset" class="small-link" type="button" aria-label="Reset preset strength">Reset</button><button id="motion-preset-lock-strength" class="small-link motion-preset-lock" type="button" aria-label="Lock preset strength" aria-pressed="false">Lock</button></div>
         <input id="motion-preset-strength" class="motion-strength-slider" type="range" min="0" max="200" step="1" value="100" aria-valuetext="100%" aria-describedby="motion-preset-strength-help">
         <p class="hint" id="motion-preset-strength-help">0% removes motion · 100% original · 200% boosted. Updates all preset previews; apply a look to change the stack. Effect amounts cap at 100.</p>
-        <div class="field-row motion-preset-strength"><label for="motion-preset-speed">Preset speed</label><output id="motion-preset-speed-value" for="motion-preset-speed">1×</output><button id="motion-preset-speed-reset" class="small-link" type="button" aria-label="Reset preset speed">Reset</button></div>
+        <div class="field-row motion-preset-strength"><label for="motion-preset-speed">Preset speed</label><output id="motion-preset-speed-value" for="motion-preset-speed">1×</output><button id="motion-preset-speed-reset" class="small-link" type="button" aria-label="Reset preset speed">Reset</button><button id="motion-preset-lock-speed" class="small-link motion-preset-lock" type="button" aria-label="Lock preset speed" aria-pressed="false">Lock</button></div>
         <input id="motion-preset-speed" class="motion-strength-slider" type="range" min="25" max="400" step="5" value="100" aria-valuetext="1×" aria-describedby="motion-preset-speed-help">
         <p class="hint" id="motion-preset-speed-help">0.25× slow · 1× original · 4× fast. Preview first, then apply. Combined speed caps at 0.25–4×. Fractional speeds may jump when looping.</p>
-        <div class="field-row motion-preset-strength"><label for="motion-preset-phase">Preset phase</label><output id="motion-preset-phase-value" for="motion-preset-phase">0°</output><button id="motion-preset-phase-reset" class="small-link" type="button" aria-label="Reset preset phase">Reset</button></div>
+        <div class="field-row motion-preset-strength"><label for="motion-preset-phase">Preset phase</label><output id="motion-preset-phase-value" for="motion-preset-phase">0°</output><button id="motion-preset-phase-reset" class="small-link" type="button" aria-label="Reset preset phase">Reset</button><button id="motion-preset-lock-phase" class="small-link motion-preset-lock" type="button" aria-label="Lock preset phase" aria-pressed="false">Lock</button></div>
         <input id="motion-preset-phase" class="motion-strength-slider" type="range" min="0" max="360" step="1" value="0" aria-valuetext="0°" aria-describedby="motion-preset-phase-help">
         <p class="hint" id="motion-preset-phase-help">Shift where every motion cycle starts. 360° returns to the original start. Preview first, then apply; layer offsets stay intact.</p>
-        <label class="toggle-row motion-preview-source"><input id="motion-preset-reverse" type="checkbox" aria-describedby="motion-preset-reverse-help"> Reverse preset direction</label>
+        <div class="motion-preset-direction"><label class="toggle-row motion-preview-source"><input id="motion-preset-reverse" type="checkbox" aria-describedby="motion-preset-reverse-help"> Reverse preset direction</label><button id="motion-preset-lock-direction" class="small-link motion-preset-lock" type="button" aria-label="Lock preset direction" aria-pressed="false">Lock</button></div>
         <p class="hint" id="motion-preset-reverse-help">Flip the original look in all preset previews, then apply. Video, audio and keyframes keep playing forward.</p>
+        <p class="hint">Locks affect Randomize only. You can still edit or reset locked controls.</p>
         <div class="two-buttons motion-preset-actions"><button id="motion-preset-randomize" class="outline-button" type="button">Randomize preset controls</button><button id="motion-preset-reset-all" class="outline-button" type="button">Reset all preset controls</button></div>
         <p class="hint" id="motion-preset-controls-status" role="status"></p>
         <p class="hint" id="motion-looks-help">Previews show each look without applying it. One click replaces source motion and the stack. Your image settings, trim and keyframes stay as they are.</p>
@@ -236,20 +238,44 @@ export class MotionEditor {
       el('motion-preset-controls-status').textContent =
         'Preset controls reset: 100% strength, 1× speed, 0° phase, original direction. Apply a look to use it.';
     });
+    for (const key of ['strength', 'speed', 'phase', 'direction'] as const) {
+      bind(`motion-preset-lock-${key}`, () => {
+        if (this.busy) return;
+        const locked = (this.presetLocks[key] = !this.presetLocks[key]);
+        const button = el<HTMLButtonElement>(`motion-preset-lock-${key}`);
+        button.setAttribute('aria-pressed', String(locked));
+        button.textContent = locked ? 'Locked' : 'Lock';
+        el('motion-preset-controls-status').textContent =
+          `Preset ${key} ${locked ? 'locked for' : 'unlocked for'} randomizing.`;
+      });
+    }
     bind('motion-preset-randomize', () => {
       if (this.busy) return;
+      const locks = this.presetLocks;
+      if (Object.values(locks).every(Boolean)) {
+        el('motion-preset-controls-status').textContent =
+          'All preset controls are locked. Unlock a control to randomize it.';
+        return;
+      }
       const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
-      const strength = 25 + Math.floor(Math.random() * 36) * 5;
-      const speed = speeds[Math.floor(Math.random() * speeds.length)];
-      let phase = Math.floor(Math.random() * 24) * 15;
-      const reverse = Math.random() < 0.5;
+      let strength = locks.strength ? this.presetStrength : 25 + Math.floor(Math.random() * 36) * 5;
+      let speed = locks.speed
+        ? this.presetSpeed
+        : speeds[Math.floor(Math.random() * speeds.length)];
+      let phase = locks.phase ? this.presetPhase : Math.floor(Math.random() * 24) * 15;
+      let reverse = locks.direction ? this.presetReverse : Math.random() < 0.5;
       if (
         strength === this.presetStrength &&
         speed === this.presetSpeed &&
-        phase === this.presetPhase % 360 &&
+        phase % 360 === this.presetPhase % 360 &&
         reverse === this.presetReverse
-      )
-        phase = (phase + 15) % 360;
+      ) {
+        // An identical draw must vary an unlocked control, even if only direction is free.
+        if (!locks.phase) phase = (phase + 15) % 360;
+        else if (!locks.direction) reverse = !reverse;
+        else if (!locks.strength) strength = strength < 200 ? strength + 5 : 25;
+        else speed = speeds[(speeds.indexOf(speed) + 1) % speeds.length];
+      }
       setPresetControls({ strength, speed, phase, reverse });
       el('motion-preset-controls-status').textContent =
         `Randomized: ${strength}% strength, ${speed}× speed, ${phase}° phase, ${reverse ? 'flipped' : 'original'} direction. Apply a look to use it.`;

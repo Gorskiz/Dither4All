@@ -59,6 +59,10 @@ test('animation look cards animate cached samples, pause off-screen, and remain 
   await expect(
     page.getByRole('button', { name: 'Randomize preset controls', exact: true }),
   ).toBeDisabled();
+  for (const control of ['strength', 'speed', 'phase', 'direction'])
+    await expect(
+      page.getByRole('button', { name: `Lock preset ${control}`, exact: true }),
+    ).toBeDisabled();
   const exporting = await image();
   await page.waitForTimeout(400);
   expect(await image()).toBe(exporting);
