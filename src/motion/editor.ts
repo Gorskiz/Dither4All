@@ -125,6 +125,7 @@ export class MotionEditor {
         <div class="motion-preset-direction"><label class="toggle-row motion-preview-source"><input id="motion-preset-reverse" type="checkbox" aria-describedby="motion-preset-reverse-help"> Reverse preset direction</label><button id="motion-preset-lock-direction" class="small-link motion-preset-lock" type="button" aria-label="Lock preset direction" aria-pressed="false">Lock</button></div>
         <p class="hint" id="motion-preset-reverse-help">Flip the original look in all preset previews, then apply. Video, audio and keyframes keep playing forward.</p>
         <p class="hint">Locks affect Randomize only. You can still edit or reset locked controls.</p>
+        <div class="two-buttons motion-preset-actions"><button id="motion-preset-lock-all" class="small-link" type="button" aria-label="Lock all preset controls">Lock all</button><button id="motion-preset-unlock-all" class="small-link" type="button" aria-label="Unlock all preset controls">Unlock all</button></div>
         <div class="two-buttons motion-preset-actions"><button id="motion-preset-randomize" class="outline-button" type="button">Randomize preset controls</button><button id="motion-preset-reset-all" class="outline-button" type="button">Reset all preset controls</button></div>
         <p class="hint" id="motion-preset-controls-status" role="status"></p>
         <p class="hint" id="motion-looks-help">Previews show each look without applying it. One click replaces source motion and the stack. Your image settings, trim and keyframes stay as they are.</p>
@@ -238,13 +239,28 @@ export class MotionEditor {
       el('motion-preset-controls-status').textContent =
         'Preset controls reset: 100% strength, 1× speed, 0° phase, original direction. Apply a look to use it.';
     });
+    const setPresetLock = (key: keyof typeof this.presetLocks, locked: boolean) => {
+      this.presetLocks[key] = locked;
+      const button = el<HTMLButtonElement>(`motion-preset-lock-${key}`);
+      button.setAttribute('aria-pressed', String(locked));
+      button.setAttribute('aria-label', `${locked ? 'Locked' : 'Lock'} preset ${key}`);
+      button.textContent = locked ? 'Locked' : 'Lock';
+    };
+    for (const locked of [true, false]) {
+      bind(`motion-preset-${locked ? 'lock' : 'unlock'}-all`, () => {
+        if (this.busy) return;
+        for (const key of ['strength', 'speed', 'phase', 'direction'] as const)
+          setPresetLock(key, locked);
+        el('motion-preset-controls-status').textContent = locked
+          ? 'All preset controls locked. Unlock a control to randomize it.'
+          : 'All preset controls unlocked for randomizing.';
+      });
+    }
     for (const key of ['strength', 'speed', 'phase', 'direction'] as const) {
       bind(`motion-preset-lock-${key}`, () => {
         if (this.busy) return;
-        const locked = (this.presetLocks[key] = !this.presetLocks[key]);
-        const button = el<HTMLButtonElement>(`motion-preset-lock-${key}`);
-        button.setAttribute('aria-pressed', String(locked));
-        button.textContent = locked ? 'Locked' : 'Lock';
+        const locked = !this.presetLocks[key];
+        setPresetLock(key, locked);
         el('motion-preset-controls-status').textContent =
           `Preset ${key} ${locked ? 'locked for' : 'unlocked for'} randomizing.`;
       });

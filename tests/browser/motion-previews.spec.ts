@@ -63,6 +63,8 @@ test('animation look cards animate cached samples, pause off-screen, and remain 
     await expect(
       page.getByRole('button', { name: `Lock preset ${control}`, exact: true }),
     ).toBeDisabled();
+  for (const action of ['Lock all preset controls', 'Unlock all preset controls'])
+    await expect(page.getByRole('button', { name: action, exact: true })).toBeDisabled();
   const exporting = await image();
   await page.waitForTimeout(400);
   expect(await image()).toBe(exporting);

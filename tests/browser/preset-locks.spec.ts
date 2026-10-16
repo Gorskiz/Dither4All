@@ -26,7 +26,7 @@ test('locks preserve every combination of controls, handle identical random draw
   const library = await page.evaluate(() => localStorage.getItem('dither4all-motion-presets'));
   const keys = ['strength', 'speed', 'phase', 'direction'] as const;
   const locks = keys.map((key) =>
-    page.getByRole('button', { name: `Lock preset ${key}`, exact: true }),
+    page.getByRole('button', { name: new RegExp(`^Lock(?:ed)? preset ${key}$`) }),
   );
   const strength = page.getByRole('slider', { name: 'Preset strength', exact: true });
   const speed = page.getByRole('slider', { name: 'Preset speed', exact: true });
@@ -131,4 +131,104 @@ test('locks preserve every combination of controls, handle identical random draw
     await page.locator('#motion-section').evaluate((e) => e.scrollWidth <= e.clientWidth),
   ).toBe(true);
   await page.screenshot({ path: 'test-results/preset-locks-mobile.png' });
+});
+
+test('bulk locks freeze/free all four controls without changing values, preview pixels, projects or saved presets', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Animate image', exact: true }).click();
+  await page.locator('[data-motion-preset="liquid-ink"]').click();
+  await page.getByRole('button', { name: 'Save animation preset', exact: true }).click();
+  await page.getByLabel('Animation preset name', { exact: true }).fill('Bulk locks');
+  await page
+    .locator('#motion-preset-form')
+    .getByRole('button', { name: 'Save', exact: true })
+    .click();
+  const before = await project(page);
+  const library = await page.evaluate(() => localStorage.getItem('dither4all-motion-presets'));
+  const strength = page.getByRole('slider', { name: 'Preset strength', exact: true });
+  const speed = page.getByRole('slider', { name: 'Preset speed', exact: true });
+  const phase = page.getByRole('slider', { name: 'Preset phase', exact: true });
+  const reverse = page.getByLabel('Reverse preset direction', { exact: true });
+  const values = async () => [
+    await strength.inputValue(),
+    await speed.inputValue(),
+    await phase.inputValue(),
+    String(await reverse.isChecked()),
+  ];
+  await strength.fill('87');
+  await speed.fill('105');
+  await phase.fill('217');
+  await reverse.check();
+  const current = await values();
+  const lockAll = page.getByRole('button', { name: 'Lock all preset controls', exact: true });
+  const unlockAll = page.getByRole('button', { name: 'Unlock all preset controls', exact: true });
+  const locks = ['strength', 'speed', 'phase', 'direction'].map((key) =>
+    page.getByRole('button', { name: new RegExp(`^Lock(?:ed)? preset ${key}$`) }),
+  );
+  const previews = [
+    page.locator('[data-motion-preset="liquid-ink"]'),
+    page.locator('#motion-saved-preview'),
+  ];
+  const images: string[] = [];
+  for (const card of previews) {
+    await card.scrollIntoViewIfNeeded();
+    await expect(card).toHaveAttribute('data-preview', 'poster');
+    images.push(await card.locator('canvas').evaluate((c) => (c as HTMLCanvasElement).toDataURL()));
+  }
+  await locks[0].click(); // Begin with a mixed selection.
+  await lockAll.click();
+  for (const lock of locks) {
+    await expect(lock).toHaveAttribute('aria-pressed', 'true');
+    await expect(lock).toHaveText('Locked');
+  }
+  await expect(page.locator('#motion-preset-controls-status')).toContainText(
+    'All preset controls locked',
+  );
+  expect(await values()).toEqual(current);
+  await page.getByRole('button', { name: 'Randomize preset controls', exact: true }).click();
+  expect(await values()).toEqual(current);
+  await unlockAll.focus();
+  await unlockAll.press('Enter');
+  await expect(unlockAll).toBeFocused();
+  for (const lock of locks) {
+    await expect(lock).toHaveAttribute('aria-pressed', 'false');
+    await expect(lock).toHaveText('Lock');
+  }
+  await expect(page.locator('#motion-preset-controls-status')).toContainText(
+    'All preset controls unlocked',
+  );
+  expect(await values()).toEqual(current);
+  await unlockAll.click(); // Repeated bulk actions are safe.
+  for (let i = 0; i < previews.length; i++) {
+    await previews[i].scrollIntoViewIfNeeded();
+    await expect(previews[i]).toHaveAttribute('data-preview', 'poster');
+    expect(
+      await previews[i].locator('canvas').evaluate((c) => (c as HTMLCanvasElement).toDataURL()),
+    ).toBe(images[i]);
+  }
+  expect(await project(page)).toEqual(before);
+  expect(await page.evaluate(() => localStorage.getItem('dither4all-motion-presets'))).toBe(
+    library,
+  );
+  await page.getByRole('button', { name: 'Randomize preset controls', exact: true }).click();
+  expect(await values()).not.toEqual(current);
+  // Bulk locking still allows a single control to be released afterward.
+  await lockAll.focus();
+  await lockAll.press('Space');
+  await expect(lockAll).toBeFocused();
+  await locks[3].click();
+  for (const lock of locks.slice(0, 3)) await expect(lock).toHaveAttribute('aria-pressed', 'true');
+  await expect(locks[3]).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('button', { name: 'Play previews', exact: true })).toBeVisible();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.setViewportSize({ width: 320, height: 844 });
+  await lockAll.scrollIntoViewIfNeeded();
+  expect(
+    await page.locator('#motion-section').evaluate((e) => e.scrollWidth <= e.clientWidth),
+  ).toBe(true);
+  await page.screenshot({ path: 'test-results/preset-bulk-locks-mobile.png' });
 });
