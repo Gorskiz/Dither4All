@@ -32,9 +32,9 @@ test('lock choices survive reload and a fresh browser session, including bulk lo
   await animate(page);
   await expectLocks(page, [true, false, true, false]);
   await expect(page.getByRole('slider', { name: 'Preset strength', exact: true })).toHaveValue(
-    '100',
+    '175',
   );
-  await expect(page.getByRole('slider', { name: 'Preset phase', exact: true })).toHaveValue('0');
+  await expect(page.getByRole('slider', { name: 'Preset phase', exact: true })).toHaveValue('90');
   await page.getByRole('button', { name: 'Reset all preset controls', exact: true }).click();
   expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), key)).toEqual(saved);
   const fresh = await browser.newContext({

@@ -41,6 +41,7 @@ import {
 } from './saved-presets';
 import { MotionPresetPreviews } from './preset-previews';
 import { loadPresetLocks, savePresetLocks, presetLockDefaults } from './lock-preferences';
+import { loadPresetControls, savePresetControls, type PresetControls } from './control-preferences';
 import type { CanvasSink } from 'mediabunny';
 
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -126,6 +127,7 @@ export class MotionEditor {
         <div class="motion-preset-direction"><label class="toggle-row motion-preview-source"><input id="motion-preset-reverse" type="checkbox" aria-describedby="motion-preset-reverse-help"> Reverse preset direction</label><button id="motion-preset-lock-direction" class="small-link motion-preset-lock" type="button" aria-label="Lock preset direction" aria-pressed="false">Lock</button></div>
         <p class="hint" id="motion-preset-reverse-help">Flip the original look in all preset previews, then apply. Video, audio and keyframes keep playing forward.</p>
         <p class="hint">Locks affect Randomize only. You can still edit or reset locked controls.</p>
+        <p id="motion-preset-values-note" class="hint" role="status" hidden></p>
         <p id="motion-preset-lock-note" class="hint" role="status" hidden></p>
         <div class="two-buttons motion-preset-actions"><button id="motion-preset-lock-all" class="small-link" type="button" aria-label="Lock all preset controls">Lock all</button><button id="motion-preset-unlock-all" class="small-link" type="button" aria-label="Unlock all preset controls">Unlock all</button></div>
         <div class="two-buttons motion-preset-actions"><button id="motion-preset-randomize" class="outline-button" type="button">Randomize preset controls</button><button id="motion-preset-reset-all" class="outline-button" type="button">Reset all preset controls</button></div>
@@ -194,17 +196,19 @@ export class MotionEditor {
       (el(id).onclick = () => {
         Promise.resolve().then(fn).catch(host.error);
       });
-    const setPresetControls = ({
-      strength = this.presetStrength,
-      speed = this.presetSpeed,
-      phase = this.presetPhase,
-      reverse = this.presetReverse,
-    }: {
-      strength?: number;
-      speed?: number;
-      phase?: number;
-      reverse?: boolean;
-    }) => {
+    const valuesPreferenceError = (message: string) => {
+      el('motion-preset-values-note').textContent = message;
+      el('motion-preset-values-note').hidden = !message;
+    };
+    const setPresetControls = (
+      {
+        strength = this.presetStrength,
+        speed = this.presetSpeed,
+        phase = this.presetPhase,
+        reverse = this.presetReverse,
+      }: Partial<PresetControls>,
+      persist = true,
+    ) => {
       if (this.busy) return;
       this.presetStrength = strength;
       this.presetSpeed = speed;
@@ -221,9 +225,26 @@ export class MotionEditor {
       el('motion-preset-phase-value').textContent = `${phase}°`;
       el<HTMLInputElement>('motion-preset-reverse').checked = reverse;
       this.lookPreviews.setControls({ strength, speed, phase, reverse });
+      if (persist) {
+        try {
+          savePresetControls(localStorage, { strength, speed, phase, reverse });
+          valuesPreferenceError('');
+        } catch {
+          valuesPreferenceError(
+            'Control values work for this session, but could not be saved in this browser.',
+          );
+        }
+      }
       el('motion-preset-controls-status').textContent = '';
       this.syncPresets();
     };
+    try {
+      setPresetControls(loadPresetControls(localStorage), false);
+    } catch {
+      valuesPreferenceError(
+        'Preset control values could not be restored. Controls start at defaults.',
+      );
+    }
     el<HTMLInputElement>('motion-preset-strength').oninput = () =>
       setPresetControls({ strength: number('motion-preset-strength') });
     bind('motion-preset-strength-reset', () => setPresetControls({ strength: 100 }));
