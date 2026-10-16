@@ -24,6 +24,7 @@ export interface MotionEffect {
   phase: number;
 }
 export interface MotionFrame {
+  phase?: number;
   speed?: number;
   progress: number;
   effects: MotionEffect[];
@@ -75,12 +76,19 @@ export function validateMotionReverse(value: unknown = false): boolean {
   if (typeof value !== 'boolean') throw new Error('Use a valid animation reverse toggle.');
   return value;
 }
+/** A full turn is the original starting phase. */
+export function validateMotionPhase(value: unknown = 0): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 360)
+    throw new Error('Use an animation phase from 0° to 360°.');
+  return value % 360;
+}
 export function validateMotionFrame(value: unknown): MotionFrame {
   const f = value as MotionFrame;
   if (!f || !Number.isFinite(f.progress) || f.progress < 0 || f.progress > 1)
     throw new Error('Invalid motion frame.');
   return {
     progress: f.progress,
+    phase: validateMotionPhase(f.phase),
     speed: validateMotionSpeed(f.speed),
     effects: validateMotionEffects(f.effects),
   };

@@ -38,6 +38,7 @@ describe('saved animation presets', () => {
       'cycles',
       'effect',
       'effects',
+      'phase',
       'reverse',
       'speed',
     ]);
@@ -88,6 +89,9 @@ describe('saved animation presets', () => {
       { speed: null },
       { reverse: null },
       { reverse: 'true' },
+      { phase: null },
+      { phase: -1 },
+      { phase: 361 },
     ]) {
       store.setItem(
         MOTION_PRESETS_KEY,
@@ -142,6 +146,7 @@ describe('animation preset sharing', () => {
       'cycles',
       'effect',
       'effects',
+      'phase',
       'reverse',
       'speed',
     ]);

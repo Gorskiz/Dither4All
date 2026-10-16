@@ -5,6 +5,7 @@ import {
   validateMotionEffects,
   validateMotionSpeed,
   validateMotionReverse,
+  validateMotionPhase,
   type MotionEffect,
   type MotionFrame,
 } from './catalog';
@@ -33,6 +34,7 @@ export interface Timeline {
   amount: number;
   speed?: number;
   reverse?: boolean;
+  phase?: number;
   cycles: number;
   easing: 'linear' | 'smooth' | 'hold';
   keys: Keyframe[];
@@ -47,6 +49,7 @@ export const timelineDefaults = (duration = 4): Timeline => ({
   amount: 35,
   speed: 1,
   reverse: false,
+  phase: 0,
   cycles: 1,
   easing: 'smooth',
   keys: [],
@@ -86,6 +89,7 @@ export function validateTimeline(value: unknown, duration: number): Timeline {
     ...structuredClone(t),
     speed: validateMotionSpeed(t.speed),
     reverse: validateMotionReverse(t.reverse),
+    phase: validateMotionPhase(t.phase),
     effects: validateMotionEffects(t.effects === undefined ? [] : t.effects),
   };
 }
@@ -125,7 +129,11 @@ export function motionProgress(t: Timeline, time: number) {
   return t.reverse ? 1 - progress : progress;
 }
 export function phase(t: Timeline, time: number) {
-  return motionProgress(t, time) * Math.PI * 2 * t.cycles * (t.speed ?? 1);
+  return (
+    (motionProgress(t, time) * t.cycles * (t.speed ?? 1) + ((t.phase ?? 0) % 360) / 360) *
+    Math.PI *
+    2
+  );
 }
 export function animateNoise(p: Pixels, t: Timeline, time: number, seed: number): Pixels {
   if (t.effect !== 'boil') return p;
@@ -137,6 +145,8 @@ export function animateNoise(p: Pixels, t: Timeline, time: number, seed: number)
     const index = Math.min(last, Math.max(0, Math.floor(elapsed * t.fps + 0.00001)));
     elapsed = (last - index) / t.fps;
   }
+  const offset = Math.floor((frameCount(t) * ((t.phase ?? 0) % 360)) / 360);
+  if (offset) elapsed = ((Math.floor(elapsed * t.fps + 0.00001) + offset) % frameCount(t)) / t.fps;
   const frame = Math.floor(elapsed * t.fps * (t.speed ?? 1) + 0.00001);
   for (let i = 0; i < data.length; i += 4) {
     const n =
@@ -173,5 +183,6 @@ export function motionAt(t: Timeline, time: number): MotionFrame {
     progress: motionProgress(t, time),
     effects: t.effects,
     speed: t.speed ?? 1,
+    phase: t.phase ?? 0,
   };
 }

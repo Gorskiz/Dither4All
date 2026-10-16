@@ -45,6 +45,7 @@ export class MotionPresetPreviews {
   private strength = 100;
   private speed = 1;
   private reverse = false;
+  private phase = 0;
   private width = WIDTH;
   private height = HEIGHT;
   private origin = performance.now();
@@ -178,6 +179,11 @@ export class MotionPresetPreviews {
     this.reverse = value;
     this.invalidateFrames();
   }
+  setPhase(value: number) {
+    if (this.disposed || this.phase === value % 360) return;
+    this.phase = value % 360;
+    this.invalidateFrames();
+  }
   private invalidateFrames() {
     for (const p of this.previews) {
       p.revision++;
@@ -271,6 +277,7 @@ export class MotionPresetPreviews {
             this.strength,
             this.speed,
             this.reverse,
+            this.phase,
           );
           t.fps = PREVIEW_FPS;
           const time = index / PREVIEW_FPS;

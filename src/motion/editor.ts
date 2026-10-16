@@ -87,6 +87,7 @@ export class MotionEditor {
   private presetStrength = 100;
   private presetSpeed = 1;
   private presetReverse = false;
+  private presetPhase = 0;
   private importingPresets = false;
   private savedMotionPresets: SavedMotionPreset[] = [];
   private presetEdit: { kind: 'save' } | { kind: 'rename'; id: string } | null = null;
@@ -117,6 +118,9 @@ export class MotionEditor {
         <div class="field-row motion-preset-strength"><label for="motion-preset-speed">Preset speed</label><output id="motion-preset-speed-value" for="motion-preset-speed">1×</output><button id="motion-preset-speed-reset" class="small-link" type="button" aria-label="Reset preset speed">Reset</button></div>
         <input id="motion-preset-speed" class="motion-strength-slider" type="range" min="25" max="400" step="5" value="100" aria-valuetext="1×" aria-describedby="motion-preset-speed-help">
         <p class="hint" id="motion-preset-speed-help">0.25× slow · 1× original · 4× fast. Preview first, then apply. Combined speed caps at 0.25–4×. Fractional speeds may jump when looping.</p>
+        <div class="field-row motion-preset-strength"><label for="motion-preset-phase">Preset phase</label><output id="motion-preset-phase-value" for="motion-preset-phase">0°</output><button id="motion-preset-phase-reset" class="small-link" type="button" aria-label="Reset preset phase">Reset</button></div>
+        <input id="motion-preset-phase" class="motion-strength-slider" type="range" min="0" max="360" step="1" value="0" aria-valuetext="0°" aria-describedby="motion-preset-phase-help">
+        <p class="hint" id="motion-preset-phase-help">Shift where every motion cycle starts. 360° returns to the original start. Preview first, then apply; layer offsets stay intact.</p>
         <label class="toggle-row motion-preview-source"><input id="motion-preset-reverse" type="checkbox" aria-describedby="motion-preset-reverse-help"> Reverse preset direction</label>
         <p class="hint" id="motion-preset-reverse-help">Flip the original look in all preset previews, then apply. Video, audio and keyframes keep playing forward.</p>
         <p class="hint" id="motion-looks-help">Previews show each look without applying it. One click replaces source motion and the stack. Your image settings, trim and keyframes stay as they are.</p>
@@ -137,6 +141,7 @@ export class MotionEditor {
         <div class="field-row"><label for="motion-cycles">Cycles</label><input id="motion-cycles" type="number" min="1" max="8" value="1"></div>
         <div class="field-row"><label for="motion-speed">Animation speed</label><input id="motion-speed" type="number" min="0.25" max="4" step="any" value="1" aria-describedby="motion-speed-help"></div>
         <p class="hint" id="motion-speed-help">Applied speed for source motion and the stack. Video playback, keyframes and export FPS keep their timing.</p>
+        <div class="field-row"><label for="motion-phase">Animation phase (°)</label><input id="motion-phase" type="number" min="0" max="360" step="any" value="0"></div>
         <label class="toggle-row motion-preview-source"><input id="motion-reverse" type="checkbox"> Reverse animation</label>
         <div class="section-title motion-subheading"><h3>Motion stack</h3><span id="motion-stack-count" class="count">0 / 8</span></div>
         <p class="hint">Applied top to bottom after dithering. Combine up to eight effects.</p>
@@ -206,6 +211,18 @@ export class MotionEditor {
     el<HTMLInputElement>('motion-preset-speed').oninput = () =>
       setPresetSpeed(number('motion-preset-speed') / 100);
     bind('motion-preset-speed-reset', () => setPresetSpeed(1));
+    const setPresetPhase = (value: number) => {
+      if (this.busy) return;
+      this.presetPhase = value;
+      el<HTMLInputElement>('motion-preset-phase').value = String(value);
+      el('motion-preset-phase').setAttribute('aria-valuetext', `${value}°`);
+      el('motion-preset-phase-value').textContent = `${value}°`;
+      this.lookPreviews.setPhase(value);
+      this.syncPresets();
+    };
+    el<HTMLInputElement>('motion-preset-phase').oninput = () =>
+      setPresetPhase(number('motion-preset-phase'));
+    bind('motion-preset-phase-reset', () => setPresetPhase(0));
     el<HTMLInputElement>('motion-preset-reverse').onchange = () => {
       if (this.busy) return;
       this.presetReverse = el<HTMLInputElement>('motion-preset-reverse').checked;
@@ -240,6 +257,7 @@ export class MotionEditor {
       'motion-amount',
       'motion-cycles',
       'motion-speed',
+      'motion-phase',
       'key-easing',
     ]) {
       el(id).onchange = () => {
@@ -287,13 +305,14 @@ export class MotionEditor {
               this.presetStrength,
               this.presetSpeed,
               this.presetReverse,
+              this.presetPhase,
             ),
             this.duration,
           );
           this.sync();
           this.refresh();
           el('motion-stack-status').textContent =
-            `${preset.name} applied at ${this.presetStrength}% strength and ${this.t.speed}× speed${this.t.reverse ? ' · reversed' : ''}. Source motion and stack replaced.`;
+            `${preset.name} applied at ${this.presetStrength}% strength and ${this.t.speed}× speed${this.t.reverse ? ' · reversed' : ''} · ${this.t.phase}° phase. Source motion and stack replaced.`;
           if (playing) this.play();
         } catch (error) {
           this.host.error(error);
@@ -390,13 +409,14 @@ export class MotionEditor {
             this.presetStrength,
             this.presetSpeed,
             this.presetReverse,
+            this.presetPhase,
           ),
           this.duration,
         );
         this.sync();
         this.refresh();
         el('motion-preset-status').textContent =
-          `Applied “${preset.name}” at ${this.presetStrength}% strength and ${this.t.speed}× speed${this.t.reverse ? ' · reversed' : ''}. Source motion and stack replaced.`;
+          `Applied “${preset.name}” at ${this.presetStrength}% strength and ${this.t.speed}× speed${this.t.reverse ? ' · reversed' : ''} · ${this.t.phase}° phase. Source motion and stack replaced.`;
         if (playing) this.play();
       }),
     );
@@ -619,6 +639,7 @@ export class MotionEditor {
       'motion-amount': this.t.amount,
       'motion-cycles': this.t.cycles,
       'motion-speed': this.t.speed ?? 1,
+      'motion-phase': this.t.phase ?? 0,
       'key-easing': this.t.easing,
     };
     for (const [id, value] of Object.entries(values))
@@ -693,6 +714,7 @@ export class MotionEditor {
             this.presetStrength,
             this.presetSpeed,
             this.presetReverse,
+            this.presetPhase,
           ),
         ),
       );
@@ -821,6 +843,7 @@ export class MotionEditor {
       amount: number('motion-amount'),
       cycles: number('motion-cycles'),
       speed: number('motion-speed'),
+      phase: number('motion-phase'),
       easing: el<HTMLSelectElement>('key-easing').value as Timeline['easing'],
     };
     if (duration !== this.duration) {
