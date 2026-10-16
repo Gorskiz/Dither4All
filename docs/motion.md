@@ -24,7 +24,11 @@ Choose an effect under **Motion stack** and click **Add effect**. Combine up to 
 - **CRT roll:** moving scanlines and a dark rolling band. Amount controls darkness.
 - **Palette cycling:** steps colors through the palette in swatch order. Amount controls the proportion of pixels that cycle using a fixed ordered mask, preserving swatch colors. Requires **Palette** color mode; RGB mode skips this effect and shows a preview notice. Place it before CRT to keep the CRT shading, or after CRT to remap the shaded colors.
 
-Flow, ripple, and CRT have matching start/end states. Palette cycling is deliberately stepped and glitch bursts deliberately cut. Integer cycles repeat over the selection, and phase offsets each entry. Source motion and adjustment keyframes still work alongside the stack. The effect controls themselves are constant over a selection; numeric adjustment keyframes remain available below the stack.
+- **Shockwave:** a localized distortion ring expands from the center and resets after passing the corners. Amount controls displacement distance.
+- **Twist:** the center winds and unwinds while the outer region stays still. Amount controls the rotation strength.
+- **Water reflection:** mirrors the image into a water region with moving horizontal waves. Amount controls the water coverage (up to the lower half) and wave displacement. The image above the waterline stays unchanged.
+
+Flow, ripple, CRT, shockwave, twist, and reflection have matching start/end states. Palette cycling is deliberately stepped and glitch bursts deliberately cut. Integer cycles repeat over the selection, and phase offsets each entry. Source motion and adjustment keyframes still work alongside the stack. The effect controls themselves are constant over a selection; numeric adjustment keyframes remain available below the stack.
 
 Preview, current-frame export, and animation export evaluate the same worker code using the same FPS-aligned timestamps and seed. Scrubbing to the selection end shows the last exportable frame. At matching dimensions the processed pixels match; larger exports have more detail than the reduced preview. Video/GIF encoding can additionally change colors. Preview is capped at 640 px (lower for heavy methods) and never exceeds the selected export size.
 

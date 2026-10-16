@@ -41,7 +41,7 @@ export function applyMotionEffects(image: Pixels, frame: MotionFrame, settings: 
       continue;
     }
     const a = e.amount / 100;
-    // Integer cycles plus circular time make flow/ripple/CRT endpoints identical.
+    // Integer cycles and wrapped phase give every effect matching loop endpoints.
     const cycle = fract(frame.progress * e.cycles + e.phase / 360);
     const angle = cycle * TAU;
     const source = pixels.data;
@@ -72,6 +72,12 @@ export function applyMotionEffects(image: Pixels, frame: MotionFrame, settings: 
     const nearest = e.type === 'palette' ? new Int16Array(32768).fill(-1) : null;
     const burst = Math.floor(cycle * 12);
     const active = fract(cycle * 12) < 0.28 && noise(burst, 13, settings.seed) > 0.35;
+    const shockWidth = Math.max(1, size * 0.09);
+    // Start before the center and finish past the corners, so the ring resets off-image.
+    const shockRadius = -shockWidth + cycle * (Math.hypot(w / 2, h / 2) + 2 * shockWidth);
+    const twistRadius = size * 0.5;
+    const twistAngle = Math.sin(angle) * a * 2.4;
+    const waterline = Math.round(h * (1 - a * 0.5));
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
         const p = (y * w + x) * 4;
@@ -102,6 +108,32 @@ export function applyMotionEffects(image: Pixels, frame: MotionFrame, settings: 
             sx += (dx / d) * shift;
             sy += (dy / d) * shift;
           }
+        } else if (e.type === 'shockwave') {
+          const dx = x + 0.5 - w / 2,
+            dy = y + 0.5 - h / 2;
+          const d = Math.hypot(dx, dy),
+            delta = (d - shockRadius) / shockWidth;
+          if (d > 0 && Math.abs(delta) < 1) {
+            const shift = Math.sin(delta * Math.PI) * (1 - Math.abs(delta)) * a * size * 0.09;
+            sx += (dx / d) * shift;
+            sy += (dy / d) * shift;
+          }
+        } else if (e.type === 'twist') {
+          const dx = x + 0.5 - w / 2,
+            dy = y + 0.5 - h / 2;
+          const d = Math.hypot(dx, dy);
+          if (d < twistRadius) {
+            const rotation = twistAngle * (1 - d / twistRadius) ** 2;
+            const co = Math.cos(rotation),
+              si = Math.sin(rotation);
+            sx = w / 2 - 0.5 + dx * co - dy * si;
+            sy = h / 2 - 0.5 + dx * si + dy * co;
+          }
+        } else if (e.type === 'reflection' && y >= waterline) {
+          const depth = (y - waterline + 0.5) / Math.max(1, h - waterline);
+          const wave = Math.sin(depth * 32 - angle) + 0.35 * Math.sin(depth * 63 + angle * 2);
+          sx += wave * a * size * 0.035 * depth;
+          sy = 2 * waterline - 1 - y;
         } else if (e.type === 'glitch' && active) {
           const row = Math.floor((y / h) * 36);
           if (noise(row, burst, settings.seed) > 0.55)

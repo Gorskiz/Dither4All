@@ -58,8 +58,18 @@ test('stack persists, reorders, toggles, and renders identical preview/current/s
   await page.getByLabel('Duration (s)', { exact: true }).fill('1');
   await page.getByLabel('Duration (s)', { exact: true }).press('Tab');
   await page.getByLabel('FPS', { exact: true }).selectOption('6');
-  for (const type of ['flow', 'ripple', 'glitch', 'crt', 'palette']) await add(page, type);
-  await expect(page.locator('#motion-stack-count')).toHaveText('5 / 8');
+  for (const type of [
+    'flow',
+    'ripple',
+    'glitch',
+    'crt',
+    'palette',
+    'shockwave',
+    'twist',
+    'reflection',
+  ])
+    await add(page, type);
+  await expect(page.locator('#motion-stack-count')).toHaveText('8 / 8');
   await page.getByLabel('Flowing displacement 1 Phase (°)', { exact: true }).fill('90');
   await page.getByLabel('Flowing displacement 1 Phase (°)', { exact: true }).press('Tab');
   await page.getByLabel('Flowing displacement 1 Cycles', { exact: true }).fill('2');
@@ -89,15 +99,18 @@ test('stack persists, reorders, toggles, and renders identical preview/current/s
     'crt',
     'glitch',
     'palette',
+    'shockwave',
+    'twist',
+    'reflection',
   ]);
   expect(saved[0]).toMatchObject({ phase: 90, cycles: 2 });
   expect(saved[3].enabled).toBe(false);
   await page.getByRole('button', { name: 'Remove Animated ripple 2', exact: true }).click();
-  await expect(page.locator('#motion-stack-count')).toHaveText('4 / 8');
+  await expect(page.locator('#motion-stack-count')).toHaveText('7 / 8');
   await page
     .locator('#project-input')
     .setInputFiles({ name: 'stack.d4a', mimeType: 'application/json', buffer: project });
-  await expect(page.locator('#motion-stack-count')).toHaveText('5 / 8');
+  await expect(page.locator('#motion-stack-count')).toHaveText('8 / 8');
   await expect(page.getByLabel('Enable Glitch bursts 4', { exact: true })).not.toBeChecked();
   await page.getByLabel('Playhead', { exact: true }).fill('0.5');
   await expect.poll(() => pixelHash(page)).toBe(expected);
@@ -105,30 +118,26 @@ test('stack persists, reorders, toggles, and renders identical preview/current/s
 });
 test('stack limits, keyboard controls, accessibility and narrow layout', async ({ page }) => {
   await setup(page);
-  await add(page, 'flow');
-  await add(page, 'ripple');
-  await add(page, 'glitch');
-  await add(page, 'crt');
-  await add(page, 'palette');
-  const enabled = page.getByLabel('Enable Flowing displacement 1', { exact: true });
+  for (const type of ['shockwave', 'twist', 'reflection', 'flow', 'ripple']) await add(page, type);
+  const enabled = page.getByLabel('Enable Shockwave 1', { exact: true });
   await enabled.focus();
   await enabled.press('Space');
   await expect(enabled).not.toBeChecked();
   await enabled.press('Space');
   await expect(enabled).toBeChecked();
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  await page.getByLabel('Flowing displacement 1 Amount', { exact: true }).scrollIntoViewIfNeeded();
+  await page.getByLabel('Shockwave 1 Amount', { exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'test-results/motion-stack-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 320, height: 844 });
-  await page.getByLabel('Flowing displacement 1 Amount', { exact: true }).scrollIntoViewIfNeeded();
+  await page.getByLabel('Shockwave 1 Amount', { exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'test-results/motion-stack-mobile.png', fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(await page.locator('#motion-stack').evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(
     true,
   );
-  for (let i = 0; i < 3; i++) await add(page, 'ripple');
+  for (const type of ['glitch', 'crt', 'palette']) await add(page, type);
   await expect(page.locator('#motion-stack-count')).toHaveText('8 / 8');
   await expect(page.getByRole('button', { name: 'Add effect', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'Remove Animated ripple 8', exact: true }).click();
+  await page.getByRole('button', { name: 'Remove Palette cycling 8', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Add effect', exact: true })).toBeEnabled();
 });

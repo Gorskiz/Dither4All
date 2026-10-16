@@ -43,6 +43,57 @@ describe('motion effect rendering', () => {
         );
     },
   );
+  it('shockwave is localized, resets off-image, and twist leaves its outer region still', () => {
+    const input = fixture();
+    for (const type of ['shockwave', 'twist'] as const) {
+      const effect = { ...newMotionEffect(type), amount: 100 };
+      expect(applyMotionEffects(input, { effects: [effect], progress: 0 }, settings).data).toEqual(
+        input.data,
+      );
+      const result = applyMotionEffects(input, { effects: [effect], progress: 0.25 }, settings);
+      expect(result.data).not.toEqual(input.data);
+      // Corners lie outside both the local twist and the expanding ring at this time.
+      for (const pixel of [
+        0,
+        input.width - 1,
+        input.width * (input.height - 1),
+        input.width * input.height - 1,
+      ])
+        expect(result.data.slice(pixel * 4, pixel * 4 + 4)).toEqual(
+          input.data.slice(pixel * 4, pixel * 4 + 4),
+        );
+      // Geometry must sample whole RGBA tuples, including partially transparent pixels.
+      const source = new Set(
+        Array.from({ length: input.width * input.height }, (_, i) =>
+          input.data.slice(i * 4, i * 4 + 4).join(','),
+        ),
+      );
+      for (let i = 0; i < result.data.length; i += 4)
+        expect(source.has(result.data.slice(i, i + 4).join(','))).toBe(true);
+    }
+  });
+  it('water reflection mirrors rows below the amount-controlled waterline and keeps the upper image intact', () => {
+    const input = fixture();
+    // Row colors/alpha identify vertical source coordinates independently of horizontal waves.
+    for (let y = 0; y < input.height; y++)
+      for (let x = 0; x < input.width; x++)
+        input.data.set([y * 5, 10, 20, y * 5], (y * input.width + x) * 4);
+    for (const amount of [50, 100]) {
+      const waterline = Math.round(input.height * (1 - amount / 200));
+      const result = applyMotionEffects(
+        input,
+        { effects: [{ ...newMotionEffect('reflection'), amount }], progress: 0.3 },
+        settings,
+      );
+      expect(result.data.slice(0, waterline * input.width * 4)).toEqual(
+        input.data.slice(0, waterline * input.width * 4),
+      );
+      for (let y = waterline; y < input.height; y++)
+        expect(result.data.slice(y * input.width * 4, y * input.width * 4 + 4)).toEqual(
+          new Uint8ClampedArray([(2 * waterline - 1 - y) * 5, 10, 20, (2 * waterline - 1 - y) * 5]),
+        );
+    }
+  });
   it('disabled and zero amount effects are exact no-ops, including RGB palette cycling', () => {
     const p = fixture();
     for (const type of types)
@@ -93,7 +144,7 @@ describe('motion effect rendering', () => {
     expect(sampleTime(t, 4)).toBeCloseTo(4 - 1 / 12);
   });
   it('moves alpha with geometry and handles narrow images without invalid samples', () => {
-    for (const type of ['flow', 'ripple', 'glitch'] as const) {
+    for (const type of ['flow', 'ripple', 'glitch', 'shockwave', 'twist', 'reflection'] as const) {
       const input = fixture();
       const result = applyMotionEffects(
         input,

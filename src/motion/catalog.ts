@@ -8,6 +8,12 @@ export const motionEffects = {
     name: 'Palette cycling',
     hint: 'Rotate colors through your swatches. Requires Palette color mode.',
   },
+  shockwave: { name: 'Shockwave', hint: 'An expanding ring of distortion from the center.' },
+  twist: { name: 'Twist', hint: 'Wind and unwind the center while keeping the edges still.' },
+  reflection: {
+    name: 'Water reflection',
+    hint: 'Mirror the lower portion with moving waves. Amount controls water coverage and distortion.',
+  },
 } as const;
 export type MotionEffectType = keyof typeof motionEffects;
 export interface MotionEffect {
