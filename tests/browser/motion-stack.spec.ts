@@ -57,6 +57,7 @@ test('stack persists, reorders, toggles, and renders identical preview/current/s
   await setup(page);
   await page.getByLabel('Animation speed', { exact: true }).fill('1.5');
   await page.getByLabel('Animation speed', { exact: true }).press('Tab');
+  await page.getByLabel('Reverse animation', { exact: true }).check();
   await page.getByLabel('Duration (s)', { exact: true }).fill('1');
   await page.getByLabel('Duration (s)', { exact: true }).press('Tab');
   await page.getByLabel('FPS', { exact: true }).selectOption('6');

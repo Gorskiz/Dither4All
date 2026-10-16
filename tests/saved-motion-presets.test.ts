@@ -38,6 +38,7 @@ describe('saved animation presets', () => {
       'cycles',
       'effect',
       'effects',
+      'reverse',
       'speed',
     ]);
     t.effects[0].amount = 1;
@@ -85,6 +86,8 @@ describe('saved animation presets', () => {
       { speed: 0 },
       { speed: 4.1 },
       { speed: null },
+      { reverse: null },
+      { reverse: 'true' },
     ]) {
       store.setItem(
         MOTION_PRESETS_KEY,
@@ -139,6 +142,7 @@ describe('animation preset sharing', () => {
       'cycles',
       'effect',
       'effects',
+      'reverse',
       'speed',
     ]);
     const target = storage();

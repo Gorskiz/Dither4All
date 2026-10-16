@@ -4,6 +4,7 @@ import type { Pixels } from '../engine/process';
 import {
   validateMotionEffects,
   validateMotionSpeed,
+  validateMotionReverse,
   type MotionEffect,
   type MotionFrame,
 } from './catalog';
@@ -31,6 +32,7 @@ export interface Timeline {
   effect: 'none' | 'boil' | 'pulse' | 'zoom' | 'pan';
   amount: number;
   speed?: number;
+  reverse?: boolean;
   cycles: number;
   easing: 'linear' | 'smooth' | 'hold';
   keys: Keyframe[];
@@ -44,6 +46,7 @@ export const timelineDefaults = (duration = 4): Timeline => ({
   effect: 'none',
   amount: 35,
   speed: 1,
+  reverse: false,
   cycles: 1,
   easing: 'smooth',
   keys: [],
@@ -82,6 +85,7 @@ export function validateTimeline(value: unknown, duration: number): Timeline {
   return {
     ...structuredClone(t),
     speed: validateMotionSpeed(t.speed),
+    reverse: validateMotionReverse(t.reverse),
     effects: validateMotionEffects(t.effects === undefined ? [] : t.effects),
   };
 }
@@ -115,13 +119,25 @@ export function settingsAt(base: Settings, t: Timeline, time: number): Settings 
   s.scale = Math.round(s.scale);
   return s;
 }
+/** Reverse appearance time only; media timestamps and adjustment keys use the original clock. */
+export function motionProgress(t: Timeline, time: number) {
+  const progress = Math.max(0, Math.min(1, (time - t.start) / (t.end - t.start)));
+  return t.reverse ? 1 - progress : progress;
+}
 export function phase(t: Timeline, time: number) {
-  return ((time - t.start) / (t.end - t.start)) * Math.PI * 2 * t.cycles * (t.speed ?? 1);
+  return motionProgress(t, time) * Math.PI * 2 * t.cycles * (t.speed ?? 1);
 }
 export function animateNoise(p: Pixels, t: Timeline, time: number, seed: number): Pixels {
   if (t.effect !== 'boil') return p;
-  const data = new Uint8ClampedArray(p.data),
-    frame = Math.floor((time - t.start) * t.fps * (t.speed ?? 1) + 0.00001);
+  const data = new Uint8ClampedArray(p.data);
+  // Noise is sampled in discrete frames: reverse the exportable frame sequence exactly.
+  let elapsed = time - t.start;
+  if (t.reverse) {
+    const last = frameCount(t) - 1;
+    const index = Math.min(last, Math.max(0, Math.floor(elapsed * t.fps + 0.00001)));
+    elapsed = (last - index) / t.fps;
+  }
+  const frame = Math.floor(elapsed * t.fps * (t.speed ?? 1) + 0.00001);
   for (let i = 0; i < data.length; i += 4) {
     const n =
       (noise((i / 4) % p.width, Math.floor(i / 4 / p.width), seed + frame * 7919) - 0.5) *
@@ -154,7 +170,7 @@ export function sampleTime(t: Timeline, time: number): number {
 }
 export function motionAt(t: Timeline, time: number): MotionFrame {
   return {
-    progress: Math.max(0, Math.min(1, (time - t.start) / (t.end - t.start))),
+    progress: motionProgress(t, time),
     effects: t.effects,
     speed: t.speed ?? 1,
   };

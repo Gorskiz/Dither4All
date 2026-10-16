@@ -46,6 +46,7 @@ export class MotionPresetPreviews {
   private inputSignature = '';
   private strength = 100;
   private speed = 1;
+  private reverse = false;
   private width = WIDTH;
   private height = HEIGHT;
   private origin = performance.now();
@@ -180,6 +181,11 @@ export class MotionPresetPreviews {
     this.speed = value;
     this.invalidateFrames();
   }
+  setReverse(value: boolean) {
+    if (this.disposed || this.reverse === value) return;
+    this.reverse = value;
+    this.invalidateFrames();
+  }
   private invalidateFrames() {
     for (const p of this.previews) {
       p.revision++;
@@ -267,6 +273,7 @@ export class MotionPresetPreviews {
             p.appearance,
             this.strength,
             this.speed,
+            this.reverse,
           );
           t.fps = PREVIEW_FPS;
           const time = index / PREVIEW_FPS;

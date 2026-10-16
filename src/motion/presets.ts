@@ -2,12 +2,16 @@ import {
   newMotionEffect,
   validateMotionEffects,
   validateMotionSpeed,
+  validateMotionReverse,
   type MotionEffect,
   type MotionEffectType,
 } from './catalog';
 import { timelineDefaults, validateTimeline, type Timeline } from './model';
 
-export type MotionAppearance = Pick<Timeline, 'effect' | 'amount' | 'cycles' | 'effects' | 'speed'>;
+export type MotionAppearance = Pick<
+  Timeline,
+  'effect' | 'amount' | 'cycles' | 'effects' | 'speed' | 'reverse'
+>;
 export function captureMotionAppearance(value: MotionAppearance): MotionAppearance {
   const validated = validateTimeline(
     {
@@ -15,6 +19,7 @@ export function captureMotionAppearance(value: MotionAppearance): MotionAppearan
       effect: value.effect,
       amount: value.amount,
       speed: value.speed,
+      reverse: value.reverse,
       cycles: value.cycles,
       effects: validateMotionEffects(value.effects),
     },
@@ -24,6 +29,7 @@ export function captureMotionAppearance(value: MotionAppearance): MotionAppearan
     effect: validated.effect,
     amount: validated.amount,
     speed: validated.speed ?? 1,
+    reverse: validated.reverse ?? false,
     cycles: validated.cycles,
     effects: validated.effects,
   };
@@ -33,14 +39,17 @@ export function scaleMotionAppearance(
   value: MotionAppearance,
   strength = 100,
   speed = 1,
+  reverse = false,
 ): MotionAppearance {
   if (!Number.isFinite(strength) || strength < 0 || strength > 200)
     throw new Error('Use a preset strength from 0 to 200%.');
   validateMotionSpeed(speed);
+  validateMotionReverse(reverse);
   const appearance = captureMotionAppearance(value);
   const scale = (amount: number) => Math.min(100, (amount * strength) / 100);
   return {
     ...appearance,
+    reverse: (appearance.reverse ?? false) !== reverse,
     speed: Math.max(0.25, Math.min(4, (appearance.speed ?? 1) * speed)),
     amount: scale(appearance.amount),
     effects: appearance.effects.map((effect) => ({ ...effect, amount: scale(effect.amount) })),
@@ -51,8 +60,12 @@ export function applyMotionAppearance(
   appearance: MotionAppearance,
   strength = 100,
   speed = 1,
+  reverse = false,
 ): Timeline {
-  return { ...structuredClone(timeline), ...scaleMotionAppearance(appearance, strength, speed) };
+  return {
+    ...structuredClone(timeline),
+    ...scaleMotionAppearance(appearance, strength, speed, reverse),
+  };
 }
 
 interface MotionPreset {
@@ -122,6 +135,7 @@ export function applyMotionPreset(
   id: string,
   strength = 100,
   speed = 1,
+  reverse = false,
 ): Timeline {
   const preset = motionPresets.find((p) => p.id === id);
   if (!preset) throw new Error('Unknown motion look.');
@@ -130,6 +144,7 @@ export function applyMotionPreset(
     { ...preset.source, effects: [...preset.effects] },
     strength,
     speed,
+    reverse,
   );
 }
 
@@ -139,6 +154,7 @@ export function matchesMotionPreset(
   id: string,
   strength = 100,
   speed = 1,
+  reverse = false,
 ): boolean {
   const preset = motionPresets.find((p) => p.id === id);
   if (!preset) return false;
@@ -146,12 +162,14 @@ export function matchesMotionPreset(
     { ...preset.source, effects: [...preset.effects] },
     strength,
     speed,
+    reverse,
   );
   return (
     timeline.effect === appearance.effect &&
     timeline.amount === appearance.amount &&
     timeline.cycles === appearance.cycles &&
     (timeline.speed ?? 1) === appearance.speed &&
+    (timeline.reverse ?? false) === appearance.reverse &&
     timeline.effects.length === appearance.effects.length &&
     timeline.effects.every((e, i) => {
       const p = appearance.effects[i];

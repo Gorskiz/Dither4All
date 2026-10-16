@@ -71,6 +71,10 @@ export function validateMotionSpeed(value: unknown = 1): number {
     throw new Error('Use an animation speed from 0.25× to 4×.');
   return value;
 }
+export function validateMotionReverse(value: unknown = false): boolean {
+  if (typeof value !== 'boolean') throw new Error('Use a valid animation reverse toggle.');
+  return value;
+}
 export function validateMotionFrame(value: unknown): MotionFrame {
   const f = value as MotionFrame;
   if (!f || !Number.isFinite(f.progress) || f.progress < 0 || f.progress > 1)

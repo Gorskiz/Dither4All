@@ -9,6 +9,7 @@ import {
   gifDelay,
   outputDimensions,
   phase,
+  motionProgress,
   settingsAt,
   validateTimeline,
   type Timeline,
@@ -94,9 +95,7 @@ export function drawMotion(
     ctx.drawImage(input, (-w * (zoom - 1)) / 2, (-h * (zoom - 1)) / 2, w * zoom, h * zoom);
   } else if (t.effect === 'pan') {
     const offset =
-      (((((time - t.start) / (t.end - t.start)) * t.cycles * (t.speed ?? 1) * t.amount) / 100) *
-        w) %
-      w;
+      (((motionProgress(t, time) * t.cycles * (t.speed ?? 1) * t.amount) / 100) * w) % w;
     ctx.drawImage(input, -offset, 0, w, h);
     ctx.drawImage(input, w - offset, 0, w, h);
   } else ctx.drawImage(input, 0, 0, w, h);
