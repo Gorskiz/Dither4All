@@ -1408,3 +1408,20 @@ dialog > a {
   margin-top: 6px;
   overflow-wrap: anywhere;
 }
+
+.motion-look-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  background: var(--canvas);
+  image-rendering: pixelated;
+  border-radius: 2px;
+  margin-bottom: 8px;
+}
+.motion-preview-error {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 5px;
+}

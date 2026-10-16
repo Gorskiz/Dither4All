@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { applyMotionPreset, matchesMotionPreset, motionPresets } from '../src/motion/presets';
 import { timelineDefaults, validateTimeline } from '../src/motion/model';
+import { PREVIEW_FPS, PREVIEW_FRAMES } from '../src/motion/preset-previews';
+import { applyMotionEffects } from '../src/motion/effects';
+import { motionAt } from '../src/motion/model';
 import { defaults } from '../src/engine/catalog';
 import { readProject } from '../src/files';
 
@@ -50,4 +53,32 @@ describe('animation looks', () => {
     expect(() => applyMotionPreset(timelineDefaults(), '__proto__')).toThrow('Unknown motion look');
     expect(matchesMotionPreset(timelineDefaults(), 'missing')).toBe(false);
   });
+});
+
+it('samples Signal Loss glitch bursts instead of missing them between preview frames', () => {
+  const t = applyMotionPreset(timelineDefaults(), 'signal-loss');
+  const image = {
+    width: 32,
+    height: 24,
+    data: new Uint8ClampedArray(
+      Array.from({ length: 32 * 24 }, (_, i) => [
+        i % 256,
+        (i * 7) % 256,
+        (i * 13) % 256,
+        255,
+      ]).flat(),
+    ),
+  };
+  const sampledBurst = Array.from({ length: PREVIEW_FRAMES }, (_, i) => {
+    const frame = motionAt(t, i / PREVIEW_FPS);
+    const withGlitch = applyMotionEffects(image, frame, defaults);
+    const withoutGlitch = applyMotionEffects(
+      image,
+      { ...frame, effects: frame.effects.filter((e) => e.type !== 'glitch') },
+      defaults,
+    );
+    return withGlitch.data.some((v, p) => v !== withoutGlitch.data[p]);
+  });
+  expect(sampledBurst.some(Boolean)).toBe(true);
+  expect(sampledBurst.some((burst) => !burst)).toBe(true);
 });

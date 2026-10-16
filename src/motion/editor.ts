@@ -39,6 +39,7 @@ import {
   deleteMotionPreset,
   type SavedMotionPreset,
 } from './saved-presets';
+import { MotionPresetPreviews } from './preset-previews';
 import type { CanvasSink } from 'mediabunny';
 
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -82,6 +83,7 @@ export class MotionEditor {
   private pendingVideo: MotionProject['video'];
   private name = 'animation';
   private openVersion = 0;
+  private lookPreviews: MotionPresetPreviews;
   private importingPresets = false;
   private savedMotionPresets: SavedMotionPreset[] = [];
   private presetEdit: { kind: 'save' } | { kind: 'rename'; id: string } | null = null;
@@ -104,8 +106,8 @@ export class MotionEditor {
         <div class="field-row" id="duration-row"><label for="motion-duration">Duration (s)</label><input id="motion-duration" type="number" min="0.1" max="30" step="0.1" value="4"></div>
         <div class="motion-trim"><label>In (s)<input id="motion-in" type="number" min="0" step="0.01" value="0"></label><label>Out (s)<input id="motion-out" type="number" min="0.01" step="0.01" value="4"></label><label>FPS<select id="motion-fps" aria-label="FPS"><option>6</option><option selected>12</option><option>24</option><option>30</option></select></label></div>
         <p class="hint">Export a selection up to 30 seconds. Preview adapts to your device.</p>
-        <div class="section-title motion-subheading"><h3>Animation looks</h3></div>
-        <p class="hint" id="motion-looks-help">One click replaces source motion and the stack. Your image settings, trim and keyframes stay as they are.</p>
+        <div class="section-title motion-subheading"><h3>Animation looks</h3><button id="motion-preview-toggle" class="small-link" type="button">Pause previews</button></div>
+        <p class="hint" id="motion-looks-help">Sample previews show each look. One click replaces source motion and the stack. Your image settings, trim and keyframes stay as they are.</p>
         <div class="motion-looks" role="group" aria-label="Animation looks" aria-describedby="motion-looks-help">${motionPresets.map((p) => `<button type="button" class="motion-look" data-motion-preset="${p.id}" aria-pressed="false"><strong>${p.name}</strong><span>${p.description}</span></button>`).join('')}</div>
         <div class="section-title motion-subheading"><h3>Your animation presets</h3><button id="motion-preset-save" class="small-link" aria-label="Save animation preset">Save</button></div>
         <p class="hint">Save source motion and the current stack. Stored in this browser only, up to 50 presets.</p>
@@ -147,6 +149,10 @@ export class MotionEditor {
         <p class="hint">MP4/WebM depend on browser codec support. GIF is capped at 640 px. Video and GIF use a black transparency matte. Preview is silent; source audio is preserved on export.</p>
         <progress id="motion-progress" max="1" value="0" hidden aria-label="Animation export progress"></progress><p id="motion-export-status" role="status"></p><button id="motion-cancel" class="outline-button" hidden>Cancel export</button>
       </section>`,
+    );
+    this.lookPreviews = new MotionPresetPreviews(
+      document.querySelector('.motion-looks')!,
+      el<HTMLButtonElement>('motion-preview-toggle'),
     );
     el('sample').insertAdjacentHTML(
       'afterend',
@@ -447,6 +453,7 @@ export class MotionEditor {
     if (this.active) this.host.cancelStill();
     el('timeline').hidden = !this.active;
     el('motion-section').hidden = !this.active;
+    this.lookPreviews.setSuspended(!this.active || this.busy);
     el('animate-image').hidden = this.active;
     el('export').textContent = this.active ? 'Export animation' : 'Export image';
     document.querySelector('.document-kind')!.textContent = this.active
@@ -996,6 +1003,7 @@ export class MotionEditor {
     if (this.pendingVideo) throw new Error('Open the original video to relink before exporting.');
     this.pause();
     this.busy = true;
+    this.lookPreviews.setSuspended(true);
     this.exportAbort = new AbortController();
     const format = el<HTMLSelectElement>('motion-format').value as
       'mp4' | 'webm' | 'gif' | 'frames';
@@ -1040,6 +1048,7 @@ export class MotionEditor {
       }
     } finally {
       this.busy = false;
+      this.lookPreviews.setSuspended(!this.active);
       this.exportAbort = null;
       controls.forEach((c) => (c.disabled = false));
       this.stack();

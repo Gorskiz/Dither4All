@@ -16,6 +16,8 @@ To animate an adjustment, move the playhead, select a property, enter its value 
 
 ## One-click animation looks
 
+The six **Animation looks** cards show animated thumbnails on a fixed sample image so you can compare them before applying anything. Thumbnails loop over four seconds at 8 FPS; they do not follow the current source image or recipe. Use **Pause previews** to stop them or **Play previews** to resume. Reduced-motion preferences start the cards as static posters; you can opt into playback. Cards pause off-screen, in hidden tabs, and during animation export.
+
 Under **Animation looks**, click a named look to replace source motion and the motion stack with a curated combination. Image settings (including palette and dithering), duration, trim, FPS, loop, playhead and adjustment keyframes stay unchanged. Playback continues if it was already running. The selected look is highlighted; editing its effect controls clears the highlight. Projects save the resulting editable settings, so the look survives reopening without a special preset format.
 
 - **Liquid Ink:** flowing displacement and gentle ripples.
