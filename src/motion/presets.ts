@@ -1,18 +1,20 @@
 import {
   newMotionEffect,
   validateMotionEffects,
+  validateMotionSpeed,
   type MotionEffect,
   type MotionEffectType,
 } from './catalog';
 import { timelineDefaults, validateTimeline, type Timeline } from './model';
 
-export type MotionAppearance = Pick<Timeline, 'effect' | 'amount' | 'cycles' | 'effects'>;
+export type MotionAppearance = Pick<Timeline, 'effect' | 'amount' | 'cycles' | 'effects' | 'speed'>;
 export function captureMotionAppearance(value: MotionAppearance): MotionAppearance {
   const validated = validateTimeline(
     {
       ...timelineDefaults(),
       effect: value.effect,
       amount: value.amount,
+      speed: value.speed,
       cycles: value.cycles,
       effects: validateMotionEffects(value.effects),
     },
@@ -21,18 +23,25 @@ export function captureMotionAppearance(value: MotionAppearance): MotionAppearan
   return {
     effect: validated.effect,
     amount: validated.amount,
+    speed: validated.speed ?? 1,
     cycles: validated.cycles,
     effects: validated.effects,
   };
 }
-/** Scale original amounts once; speed, phase, ordering and enabled flags stay intact. */
-export function scaleMotionAppearance(value: MotionAppearance, strength = 100): MotionAppearance {
+/** Scale originals once; phase, cycles, ordering and enabled flags stay intact. */
+export function scaleMotionAppearance(
+  value: MotionAppearance,
+  strength = 100,
+  speed = 1,
+): MotionAppearance {
   if (!Number.isFinite(strength) || strength < 0 || strength > 200)
     throw new Error('Use a preset strength from 0 to 200%.');
+  validateMotionSpeed(speed);
   const appearance = captureMotionAppearance(value);
   const scale = (amount: number) => Math.min(100, (amount * strength) / 100);
   return {
     ...appearance,
+    speed: Math.max(0.25, Math.min(4, (appearance.speed ?? 1) * speed)),
     amount: scale(appearance.amount),
     effects: appearance.effects.map((effect) => ({ ...effect, amount: scale(effect.amount) })),
   };
@@ -41,8 +50,9 @@ export function applyMotionAppearance(
   timeline: Timeline,
   appearance: MotionAppearance,
   strength = 100,
+  speed = 1,
 ): Timeline {
-  return { ...structuredClone(timeline), ...scaleMotionAppearance(appearance, strength) };
+  return { ...structuredClone(timeline), ...scaleMotionAppearance(appearance, strength, speed) };
 }
 
 interface MotionPreset {
@@ -107,28 +117,41 @@ export const motionPresets: readonly MotionPreset[] = [
 ];
 
 /** Apply only motion appearance. Timing, keyframes, loop and FPS are retained. */
-export function applyMotionPreset(timeline: Timeline, id: string, strength = 100): Timeline {
+export function applyMotionPreset(
+  timeline: Timeline,
+  id: string,
+  strength = 100,
+  speed = 1,
+): Timeline {
   const preset = motionPresets.find((p) => p.id === id);
   if (!preset) throw new Error('Unknown motion look.');
   return applyMotionAppearance(
     timeline,
     { ...preset.source, effects: [...preset.effects] },
     strength,
+    speed,
   );
 }
 
 /** Derive selection from editable settings, so saved projects need no preset identifier. */
-export function matchesMotionPreset(timeline: Timeline, id: string, strength = 100): boolean {
+export function matchesMotionPreset(
+  timeline: Timeline,
+  id: string,
+  strength = 100,
+  speed = 1,
+): boolean {
   const preset = motionPresets.find((p) => p.id === id);
   if (!preset) return false;
   const appearance = scaleMotionAppearance(
     { ...preset.source, effects: [...preset.effects] },
     strength,
+    speed,
   );
   return (
     timeline.effect === appearance.effect &&
     timeline.amount === appearance.amount &&
     timeline.cycles === appearance.cycles &&
+    (timeline.speed ?? 1) === appearance.speed &&
     timeline.effects.length === appearance.effects.length &&
     timeline.effects.every((e, i) => {
       const p = appearance.effects[i];

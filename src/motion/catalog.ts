@@ -24,6 +24,7 @@ export interface MotionEffect {
   phase: number;
 }
 export interface MotionFrame {
+  speed?: number;
   progress: number;
   effects: MotionEffect[];
 }
@@ -64,9 +65,19 @@ export function validateMotionEffects(value: unknown): MotionEffect[] {
     phase,
   }));
 }
+/** Missing speed keeps projects and preset files from earlier releases at their original pace. */
+export function validateMotionSpeed(value: unknown = 1): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0.25 || value > 4)
+    throw new Error('Use an animation speed from 0.25× to 4×.');
+  return value;
+}
 export function validateMotionFrame(value: unknown): MotionFrame {
   const f = value as MotionFrame;
   if (!f || !Number.isFinite(f.progress) || f.progress < 0 || f.progress > 1)
     throw new Error('Invalid motion frame.');
-  return { progress: f.progress, effects: validateMotionEffects(f.effects) };
+  return {
+    progress: f.progress,
+    speed: validateMotionSpeed(f.speed),
+    effects: validateMotionEffects(f.effects),
+  };
 }

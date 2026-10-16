@@ -41,8 +41,8 @@ export function applyMotionEffects(image: Pixels, frame: MotionFrame, settings: 
       continue;
     }
     const a = e.amount / 100;
-    // Integer cycles and wrapped phase give every effect matching loop endpoints.
-    const cycle = fract(frame.progress * e.cycles + e.phase / 360);
+    // Whole effective cycles match loop endpoints; fractional speeds may end mid-cycle.
+    const cycle = fract(frame.progress * (frame.speed ?? 1) * e.cycles + e.phase / 360);
     const angle = cycle * TAU;
     const source = pixels.data;
     const out = new Uint8ClampedArray(source.length);

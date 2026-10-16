@@ -1,7 +1,12 @@
 import { cloneSettings, type Settings } from '../engine/catalog';
 import { noise } from '../engine/color';
 import type { Pixels } from '../engine/process';
-import { validateMotionEffects, type MotionEffect, type MotionFrame } from './catalog';
+import {
+  validateMotionEffects,
+  validateMotionSpeed,
+  type MotionEffect,
+  type MotionFrame,
+} from './catalog';
 
 export const channels = {
   brightness: [-100, 100],
@@ -25,6 +30,7 @@ export interface Timeline {
   loop: boolean;
   effect: 'none' | 'boil' | 'pulse' | 'zoom' | 'pan';
   amount: number;
+  speed?: number;
   cycles: number;
   easing: 'linear' | 'smooth' | 'hold';
   keys: Keyframe[];
@@ -37,6 +43,7 @@ export const timelineDefaults = (duration = 4): Timeline => ({
   loop: true,
   effect: 'none',
   amount: 35,
+  speed: 1,
   cycles: 1,
   easing: 'smooth',
   keys: [],
@@ -74,6 +81,7 @@ export function validateTimeline(value: unknown, duration: number): Timeline {
   }
   return {
     ...structuredClone(t),
+    speed: validateMotionSpeed(t.speed),
     effects: validateMotionEffects(t.effects === undefined ? [] : t.effects),
   };
 }
@@ -108,12 +116,12 @@ export function settingsAt(base: Settings, t: Timeline, time: number): Settings 
   return s;
 }
 export function phase(t: Timeline, time: number) {
-  return ((time - t.start) / (t.end - t.start)) * Math.PI * 2 * t.cycles;
+  return ((time - t.start) / (t.end - t.start)) * Math.PI * 2 * t.cycles * (t.speed ?? 1);
 }
 export function animateNoise(p: Pixels, t: Timeline, time: number, seed: number): Pixels {
   if (t.effect !== 'boil') return p;
   const data = new Uint8ClampedArray(p.data),
-    frame = Math.floor((time - t.start) * t.fps + 0.00001);
+    frame = Math.floor((time - t.start) * t.fps * (t.speed ?? 1) + 0.00001);
   for (let i = 0; i < data.length; i += 4) {
     const n =
       (noise((i / 4) % p.width, Math.floor(i / 4 / p.width), seed + frame * 7919) - 0.5) *
@@ -148,5 +156,6 @@ export function motionAt(t: Timeline, time: number): MotionFrame {
   return {
     progress: Math.max(0, Math.min(1, (time - t.start) / (t.end - t.start))),
     effects: t.effects,
+    speed: t.speed ?? 1,
   };
 }

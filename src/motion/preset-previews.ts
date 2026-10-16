@@ -45,6 +45,7 @@ export class MotionPresetPreviews {
   private currentSettings: Settings | undefined;
   private inputSignature = '';
   private strength = 100;
+  private speed = 1;
   private width = WIDTH;
   private height = HEIGHT;
   private origin = performance.now();
@@ -174,6 +175,11 @@ export class MotionPresetPreviews {
     this.strength = value;
     this.invalidateFrames();
   }
+  setSpeed(value: number) {
+    if (this.disposed || this.speed === value) return;
+    this.speed = value;
+    this.invalidateFrames();
+  }
   private invalidateFrames() {
     for (const p of this.previews) {
       p.revision++;
@@ -256,7 +262,12 @@ export class MotionPresetPreviews {
         const deadline = setTimeout(() => abort.abort(), 1500);
         try {
           if (!this.currentImage) this.sample ??= makeSample();
-          const t = applyMotionAppearance(timelineDefaults(4), p.appearance, this.strength);
+          const t = applyMotionAppearance(
+            timelineDefaults(4),
+            p.appearance,
+            this.strength,
+            this.speed,
+          );
           t.fps = PREVIEW_FPS;
           const time = index / PREVIEW_FPS;
           const settings = cloneSettings(this.currentSettings ?? defaults);

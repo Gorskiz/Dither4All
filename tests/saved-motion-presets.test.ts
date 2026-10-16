@@ -38,6 +38,7 @@ describe('saved animation presets', () => {
       'cycles',
       'effect',
       'effects',
+      'speed',
     ]);
     t.effects[0].amount = 1;
     expect(preset.appearance.effects).toEqual(before.effects);
@@ -81,6 +82,9 @@ describe('saved animation presets', () => {
       { effects: [{ type: 'flow' }] },
       { effects: null },
       { amount: 101 },
+      { speed: 0 },
+      { speed: 4.1 },
+      { speed: null },
     ]) {
       store.setItem(
         MOTION_PRESETS_KEY,
@@ -135,6 +139,7 @@ describe('animation preset sharing', () => {
       'cycles',
       'effect',
       'effects',
+      'speed',
     ]);
     const target = storage();
     let id = 0;

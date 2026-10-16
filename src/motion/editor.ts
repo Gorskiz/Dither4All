@@ -86,6 +86,7 @@ export class MotionEditor {
   private lookPreviews: MotionPresetPreviews;
   private previewCurrentImage = false;
   private presetStrength = 100;
+  private presetSpeed = 1;
   private importingPresets = false;
   private savedMotionPresets: SavedMotionPreset[] = [];
   private presetEdit: { kind: 'save' } | { kind: 'rename'; id: string } | null = null;
@@ -114,6 +115,9 @@ export class MotionEditor {
         <div class="field-row motion-preset-strength"><label for="motion-preset-strength">Preset strength</label><output id="motion-preset-strength-value" for="motion-preset-strength">100%</output><button id="motion-preset-strength-reset" class="small-link" type="button" aria-label="Reset preset strength">Reset</button></div>
         <input id="motion-preset-strength" class="motion-strength-slider" type="range" min="0" max="200" step="1" value="100" aria-valuetext="100%" aria-describedby="motion-preset-strength-help">
         <p class="hint" id="motion-preset-strength-help">0% removes motion · 100% original · 200% boosted. Updates all preset previews; apply a look to change the stack. Effect amounts cap at 100.</p>
+        <div class="field-row motion-preset-strength"><label for="motion-preset-speed">Preset speed</label><output id="motion-preset-speed-value" for="motion-preset-speed">1×</output><button id="motion-preset-speed-reset" class="small-link" type="button" aria-label="Reset preset speed">Reset</button></div>
+        <input id="motion-preset-speed" class="motion-strength-slider" type="range" min="25" max="400" step="5" value="100" aria-valuetext="1×" aria-describedby="motion-preset-speed-help">
+        <p class="hint" id="motion-preset-speed-help">0.25× slow · 1× original · 4× fast. Preview first, then apply. Combined speed caps at 0.25–4×. Fractional speeds may jump when looping.</p>
         <p class="hint" id="motion-looks-help">Previews show each look without applying it. One click replaces source motion and the stack. Your image settings, trim and keyframes stay as they are.</p>
         <div class="motion-looks" role="group" aria-label="Animation looks" aria-describedby="motion-looks-help">${motionPresets.map((p) => `<button type="button" class="motion-look" data-motion-preset="${p.id}" aria-pressed="false"><strong>${p.name}</strong><span>${p.description}</span></button>`).join('')}</div>
         <div class="section-title motion-subheading"><h3>Your animation presets</h3><button id="motion-preset-save" class="small-link" aria-label="Save animation preset">Save</button></div>
@@ -130,6 +134,8 @@ export class MotionEditor {
         <div class="field-row"><label for="motion-effect">Source motion</label><select id="motion-effect"><option value="none">None · source movement</option><option value="boil">Noise boil</option><option value="pulse">Brightness pulse</option><option value="zoom">Looping zoom</option><option value="pan">Horizontal drift</option></select></div>
         <div class="field-row"><label for="motion-amount">Amount</label><input id="motion-amount" type="range" min="0" max="100" step="any" value="35"></div>
         <div class="field-row"><label for="motion-cycles">Cycles</label><input id="motion-cycles" type="number" min="1" max="8" value="1"></div>
+        <div class="field-row"><label for="motion-speed">Animation speed</label><input id="motion-speed" type="number" min="0.25" max="4" step="any" value="1" aria-describedby="motion-speed-help"></div>
+        <p class="hint" id="motion-speed-help">Applied speed for source motion and the stack. Video playback, keyframes and export FPS keep their timing.</p>
         <div class="section-title motion-subheading"><h3>Motion stack</h3><span id="motion-stack-count" class="count">0 / 8</span></div>
         <p class="hint">Applied top to bottom after dithering. Combine up to eight effects.</p>
         <div class="motion-add"><label class="sr-only" for="motion-add-type">New motion effect</label><select id="motion-add-type">${Object.entries(
@@ -190,6 +196,18 @@ export class MotionEditor {
     el<HTMLInputElement>('motion-preset-strength').oninput = () =>
       setPresetStrength(number('motion-preset-strength'));
     bind('motion-preset-strength-reset', () => setPresetStrength(100));
+    const setPresetSpeed = (value: number) => {
+      if (this.busy) return;
+      this.presetSpeed = value;
+      el<HTMLInputElement>('motion-preset-speed').value = String(value * 100);
+      el('motion-preset-speed').setAttribute('aria-valuetext', `${value}×`);
+      el('motion-preset-speed-value').textContent = `${value}×`;
+      this.lookPreviews.setSpeed(value);
+      this.syncPresets();
+    };
+    el<HTMLInputElement>('motion-preset-speed').oninput = () =>
+      setPresetSpeed(number('motion-preset-speed') / 100);
+    bind('motion-preset-speed-reset', () => setPresetSpeed(1));
     bind('animate-image', () => this.animate());
     bind('motion-close', () => {
       this.assertIdle();
@@ -211,6 +229,7 @@ export class MotionEditor {
       'motion-effect',
       'motion-amount',
       'motion-cycles',
+      'motion-speed',
       'key-easing',
     ]) {
       el(id).onchange = () => {
@@ -252,13 +271,13 @@ export class MotionEditor {
           const playing = this.playing;
           this.pause();
           this.t = validateTimeline(
-            applyMotionPreset(this.t, preset.id, this.presetStrength),
+            applyMotionPreset(this.t, preset.id, this.presetStrength, this.presetSpeed),
             this.duration,
           );
           this.sync();
           this.refresh();
           el('motion-stack-status').textContent =
-            `${preset.name} applied at ${this.presetStrength}%. Source motion and stack replaced.`;
+            `${preset.name} applied at ${this.presetStrength}% strength and ${this.t.speed}× speed. Source motion and stack replaced.`;
           if (playing) this.play();
         } catch (error) {
           this.host.error(error);
@@ -349,13 +368,13 @@ export class MotionEditor {
         const playing = this.playing;
         this.pause();
         this.t = validateTimeline(
-          applyMotionAppearance(this.t, preset.appearance, this.presetStrength),
+          applyMotionAppearance(this.t, preset.appearance, this.presetStrength, this.presetSpeed),
           this.duration,
         );
         this.sync();
         this.refresh();
         el('motion-preset-status').textContent =
-          `Applied “${preset.name}” at ${this.presetStrength}%. Source motion and stack replaced.`;
+          `Applied “${preset.name}” at ${this.presetStrength}% strength and ${this.t.speed}× speed. Source motion and stack replaced.`;
         if (playing) this.play();
       }),
     );
@@ -577,6 +596,7 @@ export class MotionEditor {
       'motion-effect': this.t.effect,
       'motion-amount': this.t.amount,
       'motion-cycles': this.t.cycles,
+      'motion-speed': this.t.speed ?? 1,
       'key-easing': this.t.easing,
     };
     for (const [id, value] of Object.entries(values))
@@ -649,7 +669,7 @@ export class MotionEditor {
       const preset = motionPresets.find((p) => p.id === button.dataset.motionPreset)!;
       button.setAttribute(
         'aria-pressed',
-        String(matchesMotionPreset(this.t, preset.id, this.presetStrength)),
+        String(matchesMotionPreset(this.t, preset.id, this.presetStrength, this.presetSpeed)),
       );
       button.disabled =
         this.busy || (!!preset.requiresPalette && this.host.settings().colorMode !== 'palette');
@@ -775,6 +795,7 @@ export class MotionEditor {
       effect: el<HTMLSelectElement>('motion-effect').value as Timeline['effect'],
       amount: number('motion-amount'),
       cycles: number('motion-cycles'),
+      speed: number('motion-speed'),
       easing: el<HTMLSelectElement>('key-easing').value as Timeline['easing'],
     };
     if (duration !== this.duration) {
