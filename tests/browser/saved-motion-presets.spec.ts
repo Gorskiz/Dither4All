@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
@@ -7,6 +8,7 @@ test('custom animation presets save, survive reload, apply, rename and delete wi
 }) => {
   test.setTimeout(60_000);
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await page.getByLabel('Longest side', { exact: true }).selectOption('128');
   await page.getByRole('button', { name: /^Mirror Lake/ }).click();
@@ -56,6 +58,7 @@ test('custom animation presets save, survive reload, apply, rename and delete wi
   await expect(select.locator('option')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Apply preset', exact: true })).toBeDisabled();
   await expect(page.getByLabel('Flowing displacement 1 Amount', { exact: true })).toHaveValue('61');
+  await page.getByRole('button', { name: 'File', exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Save project', exact: true }).click();
   const project = JSON.parse((await readFile((await (await download).path())!)).toString());
@@ -70,6 +73,7 @@ test('custom preset forms cancel, reject duplicate names, and retain input on st
   page,
 }) => {
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   const open = page.getByRole('button', { name: 'Save animation preset', exact: true });
   const input = page.getByLabel('Animation preset name', { exact: true });
@@ -105,6 +109,7 @@ test('saved palette stacks show compatibility and refresh after another tab rena
   context,
 }) => {
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await page.getByLabel('Longest side', { exact: true }).selectOption('128');
   await page.getByRole('button', { name: /^Chromatic Tide/ }).click();
@@ -116,6 +121,7 @@ test('saved palette stacks show compatibility and refresh after another tab rena
     .click();
   const second = await context.newPage();
   await second.goto('/');
+  await openAdvanced(second);
   await second.getByRole('button', { name: 'Animate image', exact: true }).click();
   await second.getByLabel('Longest side', { exact: true }).selectOption('128');
   const select = second.getByLabel('Your saved animation presets', { exact: true });
@@ -144,6 +150,7 @@ test('exports selected/all presets and imports them into another browser with du
 }) => {
   test.setTimeout(60_000);
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await page.getByLabel('Longest side', { exact: true }).selectOption('128');
   await expect(page.getByRole('button', { name: 'Export all', exact: true })).toBeDisabled();
@@ -174,6 +181,7 @@ test('exports selected/all presets and imports them into another browser with du
   try {
     const other = await otherContext.newPage();
     await other.goto(page.url());
+    await openAdvanced(other);
     await other.getByRole('button', { name: 'Animate image', exact: true }).click();
     await other.getByLabel('Longest side', { exact: true }).selectOption('128');
     const select = other.getByLabel('Your saved animation presets', { exact: true });
@@ -197,25 +205,21 @@ test('exports selected/all presets and imports them into another browser with du
     await expect(other.getByLabel('Flowing displacement 1 Amount', { exact: true })).toHaveValue(
       '15',
     );
-    await other
-      .locator('#motion-preset-file')
-      .setInputFiles({
-        name: 'bad.json',
-        mimeType: 'application/json',
-        buffer: Buffer.from('{"version":2}'),
-      });
+    await other.locator('#motion-preset-file').setInputFiles({
+      name: 'bad.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from('{"version":2}'),
+    });
     await expect(other.locator('#motion-preset-status')).toContainText(
       'Invalid animation preset file',
     );
     await expect(select.locator('option')).toHaveCount(5);
     await expect(other.locator('#motion-stack-count')).toHaveText('2 / 8');
-    await other
-      .locator('#motion-preset-file')
-      .setInputFiles({
-        name: 'huge.json',
-        mimeType: 'application/json',
-        buffer: Buffer.alloc(256 * 1024 + 1, 32),
-      });
+    await other.locator('#motion-preset-file').setInputFiles({
+      name: 'huge.json',
+      mimeType: 'application/json',
+      buffer: Buffer.alloc(256 * 1024 + 1, 32),
+    });
     await expect(other.locator('#motion-preset-status')).toContainText('256 KB');
     await expect(select.locator('option')).toHaveCount(5);
     expect((await new AxeBuilder({ page: other }).analyze()).violations).toEqual([]);

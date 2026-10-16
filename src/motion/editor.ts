@@ -8,6 +8,7 @@ import {
   motionAt,
   sampleTime,
   channels,
+  frameCount,
   outputDimensions,
   settingsAt,
   timelineDefaults,
@@ -51,11 +52,18 @@ const timecode = (n: number) =>
     .toString()
     .padStart(2, '0')}:${(n % 60).toFixed(2).padStart(5, '0')}`;
 export interface MotionProject {
+  active?: boolean;
   timeline: Timeline;
   duration: number;
   video?: { name: string; size: number; lastModified: number };
 }
+export interface MotionState {
+  project?: MotionProject;
+  active: boolean;
+}
 interface Host {
+  changed: () => void;
+  previewChanged: () => void;
   settings: () => Settings;
   source: () => HTMLCanvasElement;
   setSource: (canvas: HTMLCanvasElement, name: string) => void;
@@ -68,6 +76,8 @@ interface Host {
 export class MotionEditor {
   private previewStopped = false;
   private previewSignature = '';
+  private retained = false;
+  private lastDocument = '';
   active = false;
   busy = false;
   video: VideoAsset | null = null;
@@ -108,7 +118,7 @@ export class MotionEditor {
       'afterbegin',
       `
       <section class="panel-section" id="motion-section" hidden aria-labelledby="motion-heading">
-        <div class="section-title"><h2 id="motion-heading">Motion</h2><span class="count" id="motion-kind">ANIMATION</span></div>
+        <div class="section-title"><h2 id="motion-heading">Motion</h2><span class="count" id="motion-kind">ANIMATION</span><button id="reset-motion" class="small-link">Reset motion</button></div>
         <p id="relink-note" class="hint" hidden>Choose the original video to relink this project.</p>
         <div class="field-row" id="duration-row"><label for="motion-duration">Duration (s)</label><input id="motion-duration" type="number" min="0.1" max="30" step="0.1" value="4"></div>
         <div class="motion-trim"><label>In (s)<input id="motion-in" type="number" min="0" step="0.01" value="0"></label><label>Out (s)<input id="motion-out" type="number" min="0.01" step="0.01" value="4"></label><label>FPS<select id="motion-fps" aria-label="FPS"><option>6</option><option selected>12</option><option>24</option><option>30</option></select></label></div>
@@ -348,10 +358,26 @@ export class MotionEditor {
       this.t.reverse = el<HTMLInputElement>('motion-reverse').checked;
       this.refresh();
     };
+    bind('reset-motion', () => {
+      this.assertIdle();
+      this.pause();
+      this.t = {
+        ...timelineDefaults(this.duration),
+        start: this.t.start,
+        end: this.t.end,
+        fps: this.t.fps,
+        loop: this.t.loop,
+      };
+      this.sync();
+      this.refresh();
+    });
     bind('animate-image', () => this.animate());
     bind('motion-close', () => {
       this.assertIdle();
-      this.reset();
+      this.pause();
+      this.active = false;
+      this.visible();
+      this.notifyChange();
       host.renderStill();
     });
     bind('motion-play', () => (this.playing ? this.pause() : this.play()));
@@ -360,6 +386,7 @@ export class MotionEditor {
     el<HTMLInputElement>('motion-scrub').oninput = () => this.seek(number('motion-scrub'));
     el<HTMLInputElement>('motion-loop').onchange = () => {
       this.t.loop = el<HTMLInputElement>('motion-loop').checked;
+      this.notifyChange();
     };
     for (const id of [
       'motion-duration',
@@ -382,8 +409,14 @@ export class MotionEditor {
         }
       };
     }
-    el('motion-size').onchange = () => this.refresh();
-    el('motion-format').onchange = () => this.refresh();
+    el('motion-size').onchange = () => {
+      this.refresh();
+      this.host.changed();
+    };
+    el('motion-format').onchange = () => {
+      this.refresh();
+      this.host.changed();
+    };
     el('key-channel').onchange = () => this.keyValue();
     bind('key-add', () => {
       const channel = el<HTMLSelectElement>('key-channel').value as Channel,
@@ -643,11 +676,13 @@ export class MotionEditor {
       throw new Error('Cancel or finish the animation export before opening another source.');
   }
   reset() {
+    this.lastDocument = '';
     this.presetEdit = null;
     el('motion-preset-form').hidden = true;
     this.pause();
     ++this.openVersion;
     this.active = false;
+    this.retained = false;
     this.pendingVideo = undefined;
     ++this.revision;
     this.processor?.dispose();
@@ -678,7 +713,15 @@ export class MotionEditor {
   animate() {
     this.assertIdle();
     if (this.active) return;
+    if (this.retained) {
+      this.active = true;
+      this.sync();
+      this.visible();
+      this.refresh();
+      return;
+    }
     this.reset();
+    this.retained = true;
     this.active = true;
     this.duration = 4;
     this.time = 0;
@@ -714,6 +757,7 @@ export class MotionEditor {
       this.assertIdle();
       const saved = restore ? structuredClone(this.t) : null;
       this.reset();
+      this.retained = true;
       this.video = candidate;
       this.sink = sink;
       this.active = true;
@@ -1069,7 +1113,16 @@ export class MotionEditor {
     el('cancel-preview').hidden = true;
     el('render-status').textContent = 'Preview cancelled. Change a setting to render again.';
   }
+  private notifyChange() {
+    const signature = JSON.stringify(this.snapshot());
+    if (signature !== this.lastDocument) {
+      this.lastDocument = signature;
+      this.host.changed();
+    }
+  }
   refresh() {
+    this.host.previewChanged();
+    this.notifyChange();
     this.syncPreviewSource();
     this.syncPresets();
     const signature = JSON.stringify(this.host.settings()) + JSON.stringify(this.t);
@@ -1174,8 +1227,9 @@ export class MotionEditor {
     }
   }
   project(): MotionProject | undefined {
-    return this.active
+    return this.retained
       ? {
+          active: this.active,
           timeline: structuredClone(this.t),
           duration: this.duration,
           ...(this.video
@@ -1198,7 +1252,8 @@ export class MotionEditor {
     this.duration = project.duration;
     this.time = this.t.start;
     this.pendingVideo = project.video;
-    this.active = true;
+    this.retained = true;
+    this.active = project.active ?? true;
     this.sync();
     this.visible();
     this.refresh();
@@ -1206,6 +1261,35 @@ export class MotionEditor {
       this.host.toast(
         `Project opened. Open the original video “${this.pendingVideo.name}” to relink.`,
       );
+  }
+  snapshot(): MotionState {
+    return { project: this.project(), active: this.active };
+  }
+  restoreState(state: MotionState) {
+    this.assertIdle();
+    this.pause();
+    const project = state.project;
+    if (!project) this.reset();
+    else {
+      const sameVideo =
+        !!this.video &&
+        project.video?.name === this.video.file.name &&
+        project.video?.size === this.video.file.size &&
+        project.video?.lastModified === this.video.file.lastModified;
+      if (!sameVideo) this.reset();
+      this.retained = true;
+      this.t = validateTimeline(project.timeline, project.duration);
+      this.duration = project.duration;
+      this.time = Math.max(this.t.start, Math.min(this.t.end, this.time));
+      this.pendingVideo = sameVideo ? undefined : project.video;
+      this.active = state.active;
+      this.name = project.video?.name ?? 'animation';
+      this.sync();
+    }
+    this.lastDocument = JSON.stringify(this.snapshot());
+    this.visible();
+    if (this.active) this.refresh();
+    else this.host.renderStill();
   }
   async currentFrame(signal?: AbortSignal) {
     this.pause();
@@ -1215,7 +1299,9 @@ export class MotionEditor {
       dims = outputDimensions(
         this.video?.width ?? base.width,
         this.video?.height ?? base.height,
-        number('motion-size'),
+        el<HTMLSelectElement>('motion-format').value === 'gif'
+          ? Math.min(640, number('motion-size'))
+          : number('motion-size'),
       );
     const frame = this.sink
       ? await this.sink.getCanvas(
@@ -1241,6 +1327,27 @@ export class MotionEditor {
       processor.dispose();
     }
   }
+  exportInfo() {
+    const format = el<HTMLSelectElement>('motion-format').value;
+    const base = this.host.source();
+    const dims = outputDimensions(
+      this.video?.width ?? base.width,
+      this.video?.height ?? base.height,
+      format === 'gif' ? Math.min(640, number('motion-size')) : number('motion-size'),
+    );
+    return {
+      ...dims,
+      format,
+      duration: this.t.end - this.t.start,
+      fps: this.t.fps,
+      frames: frameCount(this.t),
+      pendingVideo: !!this.pendingVideo,
+      minimumScale: Math.min(
+        this.host.settings().scale,
+        ...this.t.keys.filter((k) => k.channel === 'scale').map((k) => k.value),
+      ),
+    };
+  }
   async export() {
     if (this.busy) return;
     if (this.pendingVideo) throw new Error('Open the original video to relink before exporting.');
@@ -1252,7 +1359,7 @@ export class MotionEditor {
       'mp4' | 'webm' | 'gif' | 'frames';
     const controls = [
       ...document.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>(
-        '#motion-section input,#motion-section select,#motion-section button,#timeline button,#timeline input',
+        '#motion-section input,#motion-section select,#motion-section button,#output-section input,#output-section select,#output-section button,#timeline button,#timeline input',
       ),
     ];
     controls.forEach((c) => (c.disabled = true));
@@ -1298,6 +1405,7 @@ export class MotionEditor {
       el('motion-cancel').hidden = true;
       el('motion-progress').hidden = true;
       el<HTMLButtonElement>('export').disabled = false;
+      this.host.changed();
     }
   }
 }

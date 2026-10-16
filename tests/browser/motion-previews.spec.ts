@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -8,6 +9,7 @@ test('animation look cards animate cached samples, pause off-screen, and remain 
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await page.getByLabel('Longest side', { exact: true }).selectOption('128');
   const looks = page.getByRole('group', { name: 'Animation looks', exact: true });
@@ -51,7 +53,7 @@ test('animation look cards animate cached samples, pause off-screen, and remain 
     };
   });
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export animation', exact: true }).click();
+  await page.getByRole('button', { name: 'Download animation', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause previews', exact: true })).toBeDisabled();
   await expect(
     page.getByRole('button', { name: 'Reset all preset controls', exact: true }),
@@ -87,6 +89,7 @@ test('animation look cards animate cached samples, pause off-screen, and remain 
 test('reduced-motion users get static posters and can opt into animation', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   const card = page.locator('[data-motion-preset="liquid-ink"]');
   await card.scrollIntoViewIfNeeded();
@@ -112,6 +115,7 @@ test('reduced-motion users get static posters and can opt into animation', async
 
 test('failed thumbnail workers leave look buttons usable', async ({ page }) => {
   await page.goto('/');
+  await openAdvanced(page);
   // A new worker for cards fails, while the editor can recover after the route is removed.
   await page.route('**/src/worker.ts*', (route) =>
     route.fulfill({

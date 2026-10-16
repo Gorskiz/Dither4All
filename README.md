@@ -26,19 +26,21 @@ Requires Node.js 22.12+; Node.js 24 is used in CI.
 - **Color:** 12 built-in palettes, editable 2–256-color palettes, median-cut/Wu/K-means/KD-tree extraction, RGB quantization, and JSON/hex/GIMP palette imports and exports.
 - **Color science:** classic sRGB or linear-light averaging/diffusion; weighted RGB, Euclidean RGB, CIELAB, CIEDE2000 or luminance-only palette matching. Existing recipes retain their classic defaults.
 - **Image adjustments:** pixel scale, strength, threshold, pattern size, brightness, contrast, gamma, saturation, inversion, and a reproducible random seed.
-- **Workflow:** a continuous photo-editor inspector beside a persistent canvas, before/after comparison, zoom, undo/redo, drag and drop, clipboard paste/copy, five starting presets, saved browser presets, portable preset files, and settings links.
+- **Workflow:** five visual starting looks, a persistent canvas with section navigation, and expandable advanced controls. Search styles by name, description or texture family; save favorites and navigate the gallery with arrow keys. Image, motion, keyframe and output edits share a 60-step undo/redo history. Sliders have editable numeric values. Local drafts recover images, animation and export settings after a reload; switching to still view preserves animation. Opening new media or a project starts a new history. Before/after comparison, drag and drop, clipboard paste/copy, portable presets and settings links are supported.
 - **Motion:** video import, silent playback, scrubbing, trim points, looping, adjustment keyframes, noise boil, brightness pulse, zoom and horizontal drift, plus stackable flowing displacement, animated ripple, glitch bursts, CRT roll, palette cycling, shockwave, twist and water reflection. Six one-click animation looks combine source motion and effects, with animated previews using your current image automatically. Save, rename and delete your own animation presets in the browser, or import/export JSON to share and back them up. Preview a selected saved or imported look before applying it. Dial preset strength from 0–200% and speed from 0.25–4×, shift phase from 0–360°, or reverse the direction in previews, then apply the look. Export MP4/WebM with optional source audio, animated GIF, or PNG frames in a ZIP. [Motion guide](docs/motion.md).
-- **Files:** PNG/JPEG/WebP, SVG pixel-run paths in color or black ink, embedded-image `.d4a` project files, and batch processing to a ZIP.
+- **Files:** one export panel with PNG/JPEG/WebP, SVG pixel-run paths, aspect-locked custom dimensions, JPEG/WebP quality, and validation before downloading. Inspect output pixels renders the selected output at one CSS pixel per output pixel, before file encoding; normal canvas zoom uses a reduced preview. Animation output includes dimensions, duration, FPS, frame count, codec support, progress and cancellation. Embedded-image `.d4a` projects retain animation even in still view, plus export preferences. Batch processing exports a ZIP.
 
-All image/video decoding and processing happens on your device. No accounts, telemetry, remote fonts, image uploads, API keys, or backend. The host still receives ordinary requests to load the app. Local presets use browser storage. Shared settings links contain no image; project files do contain the source image.
+All image/video decoding and processing happens on your device. No accounts, telemetry, remote fonts, image uploads, API keys, or backend. The host still receives ordinary requests to load the app. Presets, favorites and UI preferences use browser storage. The most recent draft (source image or video poster, edits and output settings) is saved automatically to IndexedDB on this device. Video drafts and projects need the original video to be relinked. The recovery banner offers Restore or Discard; clearing browser data removes drafts and presets. Draft recovery is a convenience, not a substitute for portable project backups. Shared settings links contain no image; project files do contain the source image.
 
 ## Running and contributing
 
 ```sh
 npm run dev                 # local editor
 npm test                    # deterministic engine and file tests
-npx playwright install chromium
-npm run test:browser        # complete browser workflows
+npx playwright install chromium firefox webkit
+npm run test:browser        # complete Chromium browser workflows
+PLAYWRIGHT_BROWSER=webkit npm run test:browser -- tests/browser/workspace-flow.spec.ts tests/browser/recovery-history.spec.ts
+PLAYWRIGHT_BROWSER=firefox npm run test:browser -- tests/browser/workspace-flow.spec.ts tests/browser/recovery-history.spec.ts
 npm run build               # type check and static production build
 npm run preview             # serve the production build
 ```

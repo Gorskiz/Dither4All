@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -6,6 +7,7 @@ test('saved/imported preview selection animates without applying, stays fresh af
 }) => {
   test.setTimeout(60_000);
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await page.getByLabel('Longest side', { exact: true }).selectOption('128');
   const select = page.getByLabel('Your saved animation presets', { exact: true });
@@ -94,6 +96,7 @@ test('saved preview uses a static poster with reduced motion and refreshes after
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await page.getByRole('button', { name: /^Aftershock/ }).click();
   await page.getByRole('button', { name: 'Save animation preset', exact: true }).click();
@@ -112,6 +115,7 @@ test('saved preview uses a static poster with reduced motion and refreshes after
   expect(await image()).toBe(poster);
   const other = await context.newPage();
   await other.goto(page.url());
+  await openAdvanced(other);
   await other.evaluate(() => {
     const key = 'dither4all-motion-presets';
     const presets = JSON.parse(localStorage.getItem(key)!);

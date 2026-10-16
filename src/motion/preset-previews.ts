@@ -241,6 +241,11 @@ export class MotionPresetPreviews {
       this.stop();
       return;
     }
+    // A poster can finish while its card scrolls off-screen. Paint that cached
+    // frame on re-entry even when playback is paused and no new jobs are needed.
+    for (const p of this.previews)
+      if (this.visible.has(p.card) && p.available && !p.failed && !p.card.dataset.previewFrame)
+        this.draw(p, 0);
     if (this.userPaused) {
       clearInterval(this.timer);
       this.timer = undefined;
@@ -304,8 +309,7 @@ export class MotionPresetPreviews {
             new ImageData(new Uint8ClampedArray(result.data), result.width, result.height),
           );
           p.card.dataset.preview = p.frames.length === PREVIEW_FRAMES ? 'ready' : 'poster';
-          if (this.visible.has(p.card) && this.canRender() && !p.card.dataset.previewFrame)
-            this.draw(p, 0);
+          if (!p.card.dataset.previewFrame) this.draw(p, 0);
         } catch (error) {
           if (p.revision !== revision) continue;
           if (

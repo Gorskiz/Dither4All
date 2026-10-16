@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
@@ -14,6 +15,7 @@ test('strength previews built-in and saved looks without changing the project or
   test.setTimeout(60_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   const strength = page.getByRole('slider', { name: 'Preset strength', exact: true });
   const card = page.locator('[data-motion-preset="aftershock"]');

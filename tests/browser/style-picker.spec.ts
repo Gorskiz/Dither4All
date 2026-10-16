@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -8,6 +9,7 @@ test('style contact sheet renders every method, filters, applies and caches prev
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
+  await openAdvanced(page);
   const gallery = page.getByRole('group', { name: 'Style previews', exact: true });
   const cards = gallery.locator('button');
   await expect(cards).toHaveCount(126);
@@ -67,6 +69,7 @@ test('style contact sheet renders every method, filters, applies and caches prev
   await page.screenshot({ path: 'test-results/style-picker-mobile.png', fullPage: true });
   // A search must lazily render a previously unseen family on a fresh mobile load.
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByLabel('Find', { exact: true }).fill('DBS');
   await gallery.scrollIntoViewIfNeeded();
   await expect(gallery.locator('button:visible')).toHaveCount(7);
@@ -78,6 +81,7 @@ test('style thumbnails follow uploads automatically, preserve proportions, and i
   page,
 }) => {
   await page.goto('/');
+  await openAdvanced(page);
   const gallery = page.getByRole('group', { name: 'Style previews', exact: true });
   const card = gallery.locator('button').first();
   const image = () => card.locator('canvas').evaluate((c) => (c as HTMLCanvasElement).toDataURL());
@@ -97,13 +101,11 @@ test('style thumbnails follow uploads automatically, preserve proportions, and i
       },
       { color, width, height },
     );
-    await page
-      .locator('#image-input')
-      .setInputFiles({
-        name: 'upload.png',
-        mimeType: 'image/png',
-        buffer: Buffer.from(data, 'base64'),
-      });
+    await page.locator('#image-input').setInputFiles({
+      name: 'upload.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(data, 'base64'),
+    });
   };
   await upload('#000000', 80, 160);
   await card.scrollIntoViewIfNeeded();

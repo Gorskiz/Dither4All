@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
@@ -14,6 +15,7 @@ test('locks preserve every combination of controls, handle identical random draw
   test.setTimeout(90_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await page.locator('[data-motion-preset="liquid-ink"]').click();
   await page.getByRole('button', { name: 'Save animation preset', exact: true }).click();
@@ -139,6 +141,7 @@ test('bulk locks freeze/free all four controls without changing values, preview 
   test.setTimeout(60_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await page.locator('[data-motion-preset="liquid-ink"]').click();
   await page.getByRole('button', { name: 'Save animation preset', exact: true }).click();

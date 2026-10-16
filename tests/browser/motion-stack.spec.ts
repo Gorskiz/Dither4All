@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -39,6 +40,7 @@ function pngFromZip(zip: Buffer, frame: number) {
 }
 async function setup(page: Page) {
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await page.getByLabel('Source motion', { exact: true }).selectOption('none');
   await page.getByLabel('Longest side', { exact: true }).selectOption('128');
@@ -90,7 +92,7 @@ test('stack persists, reorders, toggles, and renders identical preview/current/s
   await expect.poll(() => pixelHash(page)).toBe(expected);
   await page.getByLabel('Motion format', { exact: true }).selectOption('frames');
   const sequenceDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export animation', exact: true }).click();
+  await page.getByRole('button', { name: 'Download animation', exact: true }).click();
   const zip = await readFile((await (await sequenceDownload).path())!);
   // Frame 3 at 6 FPS is exactly the 0.5-second scrub position.
   expect(await pixelHash(page, pngFromZip(zip, 3))).toBe(expected);

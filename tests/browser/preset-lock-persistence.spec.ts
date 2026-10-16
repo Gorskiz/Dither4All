@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect, type Page } from '@playwright/test';
 
 const key = 'dither4all-motion-preset-locks';
@@ -21,6 +22,7 @@ test('lock choices survive reload and a fresh browser session, including bulk lo
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
+  await openAdvanced(page);
   await animate(page);
   await lock(page, 'strength').click();
   await lock(page, 'phase').click();
@@ -74,6 +76,7 @@ test('corrupt preferences fall back safely and failed writes keep session locks 
 }) => {
   await page.addInitScript((key) => localStorage.setItem(key, '{invalid'), key);
   await page.goto('/');
+  await openAdvanced(page);
   await animate(page);
   await expectLocks(page, [false, false, false, false]);
   await expect(page.locator('#motion-preset-lock-note')).toContainText('could not be restored');

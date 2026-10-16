@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
@@ -8,6 +9,7 @@ test('expanded styles, perceptual controls, worker palette extraction and portab
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
+  await openAdvanced(page);
   await expect(page.locator('#render-status')).toContainText('ms');
   await expect(page.locator('#algorithm-select option')).toHaveCount(126);
   await page.getByLabel('Find', { exact: true }).fill('Knuth');

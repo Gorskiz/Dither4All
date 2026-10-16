@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
@@ -27,6 +28,7 @@ test('still animation scrubs, keyframes, plays, cancels and exports GIF/PNG sequ
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await expect(page.locator('#timeline')).toBeVisible();
   await page.getByLabel('New motion effect', { exact: true }).selectOption('flow');
@@ -49,7 +51,7 @@ test('still animation scrubs, keyframes, plays, cancels and exports GIF/PNG sequ
   await page.screenshot({ path: 'test-results/motion-editor.png', fullPage: true });
   await page.getByLabel('Motion format', { exact: true }).selectOption('gif');
   const gifDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export animation', exact: true }).click();
+  await page.getByRole('button', { name: 'Download animation', exact: true }).click();
   await expect(page.locator('#motion-export-status')).toContainText('Export ready', {
     timeout: 15000,
   });
@@ -74,12 +76,12 @@ test('still animation scrubs, keyframes, plays, cancels and exports GIF/PNG sequ
   expect(gifFrames).toBe(6);
   await page.getByLabel('Motion format', { exact: true }).selectOption('frames');
   const framesDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export animation', exact: true }).click();
+  await page.getByRole('button', { name: 'Download animation', exact: true }).click();
   const zip = await readFile((await (await framesDownload).path())!);
   expect(zip.readUInt16LE(zip.length - 12)).toBe(7); // Six PNGs and timing metadata.
   await page.getByLabel('Duration (s)', { exact: true }).fill('30');
   await page.getByLabel('Duration (s)', { exact: true }).press('Tab');
-  await page.getByRole('button', { name: 'Export animation', exact: true }).click();
+  await page.getByRole('button', { name: 'Download animation', exact: true }).click();
   await page.getByRole('button', { name: 'Cancel export', exact: true }).click();
   await expect(page.locator('#motion-export-status')).toHaveText('Export cancelled.');
   await page.getByRole('button', { name: 'Still image', exact: true }).click();
@@ -93,6 +95,7 @@ test('video import, trim, keyframe project relink, and audio-preserving MP4/WebM
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
+  await openAdvanced(page);
   const bytes = await movieFixture(page);
   const file = { name: 'moving-test.webm', mimeType: 'video/webm', buffer: Buffer.from(bytes) };
   await page.locator('#image-input').setInputFiles(file);
@@ -115,13 +118,14 @@ test('video import, trim, keyframe project relink, and audio-preserving MP4/WebM
       return (await import(/* @vite-ignore */ path)).supportsFormat(format);
     }, format);
     if (!supported) {
-      await page.getByRole('button', { name: 'Export animation', exact: true }).click();
-      await expect(page.locator('#motion-export-status')).toHaveText('Export failed.');
-      await expect(page.locator('#toast')).toContainText('unavailable');
+      await expect(
+        page.getByRole('button', { name: 'Download animation', exact: true }),
+      ).toBeDisabled();
+      await expect(page.locator('#codec-status')).toContainText('unavailable');
       continue;
     }
     const dl = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export animation', exact: true }).click();
+    await page.getByRole('button', { name: 'Download animation', exact: true }).click();
     const blob = await readFile((await (await dl).path())!);
     const meta = await metadata(page, blob);
     expect(meta.width).toBe(160);

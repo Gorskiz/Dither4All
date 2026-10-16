@@ -10,7 +10,12 @@ export default defineConfig({
   use: {
     baseURL,
     viewport: { width: 1440, height: 1100 },
-    channel: process.env.PLAYWRIGHT_CHANNEL,
+    browserName: (process.env.PLAYWRIGHT_BROWSER ?? 'chromium') as
+      'chromium' | 'firefox' | 'webkit',
+    channel:
+      process.env.PLAYWRIGHT_BROWSER && process.env.PLAYWRIGHT_BROWSER !== 'chromium'
+        ? undefined
+        : process.env.PLAYWRIGHT_CHANNEL,
   },
   webServer: {
     command: `npm run dev -- --port ${port} --strictPort`,

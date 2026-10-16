@@ -1,4 +1,8 @@
-import { methodLimits, assertProcessingSize } from './engine/limits';
+import { readOutput, applyOutput, type OutputSettings } from './output-settings';
+import { setupExportPanel } from './export-panel';
+import { setupWorkspace, LookPicker } from './workspace-ui';
+import { readDraft, writeDraft, deleteDraft, type Draft } from './recovery';
+import { methodLimits, assertProcessingSize, assertMotionBudget } from './engine/limits';
 import { FrameProcessor } from './motion/processor';
 import './style.css';
 import {
@@ -25,8 +29,9 @@ import {
   zipFiles,
 } from './files';
 import { makeSample } from './sample';
-import { MotionEditor } from './motion/editor';
+import { MotionEditor, type MotionState } from './motion/editor';
 import { StylePicker } from './style-picker';
+import { outputDimensions, frameCount } from './motion/model';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const escape = (s: string) =>
@@ -64,16 +69,17 @@ $('app').innerHTML = `
     <nav class="document-actions" aria-label="Document actions"><button id="open-project">Open project</button><button id="save-project">Save project</button><button id="batch-open">Batch</button></nav>
     <nav class="header-links" aria-label="Help and application"><button id="help-open">Guide</button><button id="about-open">About</button><a href="https://github.com/Gorskiz/Dither4All" aria-label="Dither4All on GitHub" target="_blank" rel="noopener noreferrer">${icon('github')}</a><button id="fullscreen" class="icon-button" aria-label="Toggle fullscreen">${icon('expand')}</button></nav>
   </header>
+  <div id="recovery-banner" class="recovery-banner" hidden><span id="recovery-message"></span><button id="restore-draft" class="outline-button">Restore draft</button><button id="discard-draft">Discard draft</button></div>
   <main>
     <h1 class="sr-only">Dither4All image and motion editor</h1>
     <section class="studio" aria-label="Image editor">
       <div class="editor-layout">
         <section class="preview-panel" aria-label="Image preview">
-          <div class="document-bar"><span class="document-indicator"></span><span id="image-name">Orbital study — sample image</span><span class="document-kind">IMAGE</span></div>
-          <div class="preview-toolbar"><div class="view-modes" aria-label="Preview mode"><button data-view="output" aria-pressed="true">Dithered</button><button data-view="split" aria-pressed="false">Compare</button><button data-view="original" aria-pressed="false">Original</button></div><div class="history-buttons"><button id="undo" class="icon-button" aria-label="Undo settings" title="Undo (Ctrl/⌘ Z)">${icon('undo')}</button><button id="redo" class="icon-button" aria-label="Redo settings" title="Redo (Ctrl/⌘ Shift Z)">${icon('redo')}</button><button id="reset" class="icon-button" aria-label="Reset settings" title="Reset all settings">↺</button></div></div>
+          <div class="document-bar"><span class="document-indicator"></span><span id="draft-status" role="status">Not saved yet</span><span id="image-name">Orbital study — sample image</span><span class="document-kind">IMAGE</span></div>
+          <div class="preview-toolbar"><div class="view-modes" aria-label="Preview mode"><button data-view="output" aria-pressed="true">Dithered</button><button data-view="split" aria-pressed="false">Compare</button><button data-view="original" aria-pressed="false">Original</button></div><div class="history-buttons"><button id="undo" class="icon-button" aria-label="Undo settings" title="Undo (Ctrl/⌘ Z)">${icon('undo')}</button><button id="redo" class="icon-button" aria-label="Redo settings" title="Redo (Ctrl/⌘ Shift Z)">${icon('redo')}</button><button id="reset" class="icon-button" aria-label="Reset settings" title="Reset image settings (animation is preserved)">↺</button></div></div>
           <div id="drop-zone" class="canvas-stage"><div class="drop-hint">Drop an image or video to open</div><div id="canvas-frame" class="canvas-frame"><canvas id="original-canvas" aria-label="Original image"></canvas><canvas id="output-canvas" aria-label="Dithered image"></canvas><div id="split-line" class="split-line" hidden><span>↔</span></div><span id="image-badge" class="sr-only">Dithered preview</span></div></div>
           <div id="compare-control" class="compare-control" hidden><label for="compare">Original / dithered split</label><input id="compare" type="range" min="0" max="100" value="50"></div>
-          <div class="canvas-bottom"><span id="dimensions">1200 × 900</span><button id="sample" class="small-link">Use sample</button><label class="zoom-label" for="zoom">Zoom <select id="zoom" aria-label="Zoom"><option value="fit">Fit</option><option value="50">50%</option><option value="100">100%</option><option value="200">200%</option></select></label></div>
+          <div class="canvas-bottom"><span id="dimensions">1200 × 900</span><button id="sample" class="small-link">Use sample</button><label class="zoom-label" for="zoom">Zoom <select id="zoom" aria-label="Zoom"><option value="fit">Fit</option><option value="50">50%</option><option value="100">100% preview</option><option value="200">200% preview</option></select></label></div>
           <div class="preview-status"><span id="render-status" role="status" aria-live="polite">Preparing preview…</span><button id="cancel-preview" class="small-link" hidden>Cancel preview</button><span>${icon('shield')} Local processing</span></div>
         </section>
         <aside class="inspector" aria-label="Image controls">
@@ -145,8 +151,8 @@ $('app').innerHTML = `
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <dialog id="batch-dialog" aria-labelledby="batch-dialog-title"><form method="dialog" class="dialog-header"><div><p class="eyebrow">A WHOLE LOT OF PIXELS</p><h2 id="batch-dialog-title">Batch your images.</h2></div><button class="icon-button" aria-label="Close batch">${icon('close')}</button></form><p>Apply the current settings to up to 20 images. Download one ZIP of PNGs. Each image keeps its own dimensions.</p><label class="batch-drop" for="batch-input">${icon('upload')} Choose images<input id="batch-input" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/bmp" multiple></label><ul id="batch-list" class="batch-list"></ul><p id="batch-status" role="status" aria-live="polite">Nothing selected yet.</p><button id="batch-run" class="export-button" disabled>Process & download ZIP ${icon('download')}</button><button id="batch-cancel" class="small-link" hidden>Cancel batch</button></dialog>
-  <dialog id="help-dialog" aria-labelledby="help-dialog-title"><form method="dialog" class="dialog-header"><div><p class="eyebrow">THE FIELD GUIDE</p><h2 id="help-dialog-title">Embrace the limitations.</h2></div><button class="icon-button" aria-label="Close guide">${icon('close')}</button></form><div class="guide-grid"><article><span>01</span><h3>Bring an image.</h3><p>Drop a PNG, JPG, WebP, AVIF, BMP, or GIF into the canvas. Paste from your clipboard, or start with our original sample. Animated image imports use their first frame. Open MP4, WebM or MOV to process video; choose Animate image for stills. Use Space to play, scrub the timeline, set trim points, and add adjustment keyframes. Export MP4, WebM, GIF, or a ZIP of PNG frames. Video projects store a poster and timeline; reopen the original video to relink.</p></article><article><span>02</span><h3>Find your texture.</h3><p>Diffusion gives organic grain. Ordered dithering gives a grid. Patterns give lines, dots, and halftones. Pixel scale changes texture size while preserving output dimensions.</p></article><article><span>03</span><h3>Pick your ink.</h3><p>Choose a palette, edit each swatch, or extract colors from your image. Full color mode quantizes RGB channels. CMYK uses source colors for a four-screen ink simulation.</p></article><article><span>04</span><h3>Break it beautifully.</h3><p>Add, toggle, and reorder effects. Save your settings as presets, share a settings link, or save a project with its image. Export raster images or actual SVG paths.</p></article></div><p class="guide-note">Keyboard: O opens media; + / − zoom; . resets zoom; double-click the canvas to fit; Ctrl/⌘ Z undoes; Ctrl/⌘ Shift Z redoes. Preview is reduced to 1100 px; export processes the selected full size. Images: up to 16 MP, 8192 px per side, 50 MB. SVG: up to 1 MP. Batch: 20 files, 100 MB combined.</p></dialog>
-  <dialog id="about-dialog" aria-labelledby="about-dialog-title"><form method="dialog" class="dialog-header"><h2 id="about-dialog-title">Pixels for the people.</h2><button class="icon-button" aria-label="Close about">${icon('close')}</button></form><p>Dither4All is a free, MIT-licensed image editor. Your images are decoded and processed on your device. The app has no image upload endpoint, analytics, cookies, account system, or remote fonts. Presets are saved in your browser when you choose to save them.</p><p>The host receives normal web requests to load the app. Settings links contain settings only. Project files contain the image and should be shared intentionally. Clipboard access is requested only when you copy an image.</p><p>Built from documented dithering techniques, with credited libdither algorithm/table adaptations inspired by Ditherista. Custom effects are original implementations, not replicas of proprietary modules. Video and still animation use the same local effects engine. MP4/WebM encoding depends on browser codecs. <a href="./third-party-notices.txt" target="_blank">Media libraries and licenses</a>.</p><a href="https://github.com/Gorskiz/Dither4All" target="_blank" rel="noopener noreferrer">Read the source, report a bug, make it better ↗</a></dialog>
+  <dialog id="help-dialog" aria-labelledby="help-dialog-title"><form method="dialog" class="dialog-header"><div><p class="eyebrow">THE FIELD GUIDE</p><h2 id="help-dialog-title">Embrace the limitations.</h2></div><button class="icon-button" aria-label="Close guide">${icon('close')}</button></form><div class="guide-grid"><article><span>01</span><h3>Bring an image.</h3><p>Drop a PNG, JPG, WebP, AVIF, BMP, or GIF into the canvas. Paste from your clipboard, or start with our original sample. Animated image imports use their first frame. Open MP4, WebM or MOV to process video; choose Animate image for stills. Use Space to play, scrub the timeline, set trim points, and add adjustment keyframes. Export MP4, WebM, GIF, or a ZIP of PNG frames. Video projects store a poster and timeline; reopen the original video to relink.</p></article><article><span>02</span><h3>Find your texture.</h3><p>Diffusion gives organic grain. Ordered dithering gives a grid. Patterns give lines, dots, and halftones. Pixel scale changes texture size while preserving output dimensions.</p></article><article><span>03</span><h3>Pick your ink.</h3><p>Choose a palette, edit each swatch, or extract colors from your image. Full color mode quantizes RGB channels. CMYK uses source colors for a four-screen ink simulation.</p></article><article><span>04</span><h3>Break it beautifully.</h3><p>Add, toggle, and reorder effects. Save your settings as presets, share a settings link, or save a project with its image. Export raster images or actual SVG paths.</p></article></div><p class="guide-note">Keyboard: O opens media; + / − zoom; . resets zoom; double-click the canvas to fit; Ctrl/⌘ Z undoes; Ctrl/⌘ Shift Z redoes. Preview is reduced to 1100 px. Export opens size and format options; Inspect output pixels renders the selected output at actual pixel size before encoding. Undo covers image, motion, keyframe and output edits. Still image preserves your animation. Opening new media starts a new history. A local draft can be restored after reloading. Images: up to 16 MP, 8192 px per side, 50 MB. SVG: up to 1 MP. Batch: 20 files, 100 MB combined.</p></dialog>
+  <dialog id="about-dialog" aria-labelledby="about-dialog-title"><form method="dialog" class="dialog-header"><h2 id="about-dialog-title">Pixels for the people.</h2><button class="icon-button" aria-label="Close about">${icon('close')}</button></form><p>Dither4All is a free, MIT-licensed image editor. Your images are decoded and processed on your device. The app has no image upload endpoint, analytics, cookies, account system, or remote fonts. A recoverable image and editing draft is saved automatically in this browser. Video drafts store a poster and edits; reopen the original video to relink. Presets and favorites also stay on this device. You can discard the draft from the recovery banner.</p><p>The host receives normal web requests to load the app. Settings links contain settings only. Project files contain the image and should be shared intentionally. Clipboard access is requested only when you copy an image.</p><p>Built from documented dithering techniques, with credited libdither algorithm/table adaptations inspired by Ditherista. Custom effects are original implementations, not replicas of proprietary modules. Video and still animation use the same local effects engine. MP4/WebM encoding depends on browser codecs. <a href="./third-party-notices.txt" target="_blank">Media libraries and licenses</a>.</p><a href="https://github.com/Gorskiz/Dither4All" target="_blank" rel="noopener noreferrer">Read the source, report a bug, make it better ↗</a></dialog>
   <input hidden id="image-input" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/bmp,video/mp4,video/webm,video/quicktime,video/x-matroska,.mkv,.mov">
   <input hidden id="project-input" type="file" accept=".d4a,application/json">
   <input hidden id="palette-input" type="file" accept=".json,.txt,.hex,.gpl">
@@ -161,8 +167,22 @@ let previewAbort: AbortController | null = null,
   renderTimer: ReturnType<typeof setTimeout>,
   renderVersion = 0,
   toastTimer: ReturnType<typeof setTimeout>;
-let history: Settings[] = [cloneSettings(settings)],
+interface EditorSnapshot {
+  settings: Settings;
+  motion: MotionState;
+  output: OutputSettings;
+}
+let history: EditorSnapshot[] = [],
   historyIndex = 0;
+let documentReady = false,
+  restoringHistory = false;
+let recoveryTimer: ReturnType<typeof setTimeout>;
+let recoveryRevision = 0,
+  savedRevision = 0;
+let recoveryQueue: Promise<void> = Promise.resolve();
+let pendingDraft: Draft | undefined;
+let draftImageSource: HTMLCanvasElement | undefined;
+let draftImage: Promise<Blob> | undefined;
 let importVersion = 0;
 let batchFiles: File[] = [],
   batchCancelled = false,
@@ -170,6 +190,26 @@ let batchFiles: File[] = [],
   batchAbort: AbortController | null = null;
 let exportBusy = false;
 let imageExportAbort: AbortController | null = null;
+let proofAbort: AbortController | null = null;
+let codecRevision = 0;
+let codecSignature = '';
+let codecProblem = '';
+function exportRatio() {
+  return $<HTMLSelectElement>('export-size').value === 'custom'
+    ? Number($<HTMLInputElement>('export-width').value) / source.width
+    : Number($<HTMLSelectElement>('export-size').value);
+}
+function invalidateProof() {
+  proofAbort?.abort();
+  proofAbort = null;
+  if ($('output-proof')) {
+    $('output-proof').hidden = true;
+    const canvas = $<HTMLCanvasElement>('proof-canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+  }
+  if ($('inspect-output')) $<HTMLButtonElement>('inspect-output').disabled = false;
+}
 const builtinPresets: { name: string; tag: string; settings: Settings }[] = [
   { name: 'The original', tag: 'DIFFUSION', settings: cloneSettings(defaults) },
   {
@@ -243,21 +283,103 @@ function safely(fn: () => unknown) {
 function bind(id: string, fn: () => unknown) {
   $(id).addEventListener('click', () => safely(fn));
 }
+function snapshot(): EditorSnapshot {
+  return {
+    settings: cloneSettings(settings),
+    motion: motion.snapshot(),
+    output: readOutput(source.width, source.height),
+  };
+}
 function persistHistory() {
-  if (JSON.stringify(history[historyIndex]) === JSON.stringify(settings)) return;
+  if (!documentReady || restoringHistory) return;
+  const next = snapshot();
+  if (JSON.stringify(history[historyIndex]) === JSON.stringify(next)) return;
   history = history.slice(0, historyIndex + 1);
-  history.push(cloneSettings(settings));
+  history.push(next);
   if (history.length > 60) history.shift();
   historyIndex = history.length - 1;
   syncHistory();
+  scheduleRecovery();
+  updateExportNote();
+}
+function newDocument() {
+  history = [snapshot()];
+  historyIndex = 0;
+  syncHistory();
+  scheduleRecovery();
 }
 function syncHistory() {
-  $<HTMLButtonElement>('undo').disabled = historyIndex === 0;
-  $<HTMLButtonElement>('redo').disabled = historyIndex === history.length - 1;
+  $<HTMLButtonElement>('undo').disabled = historyIndex === 0 || restoringHistory || motion?.busy;
+  $<HTMLButtonElement>('redo').disabled =
+    historyIndex >= history.length - 1 || restoringHistory || motion?.busy;
+}
+function scheduleRecovery() {
+  if (!documentReady || restoringHistory) return;
+  ++recoveryRevision;
+  pendingDraft = undefined;
+  $('recovery-banner').hidden = true;
+  $('draft-status').textContent = 'Saving draft…';
+  clearTimeout(recoveryTimer);
+  recoveryTimer = setTimeout(saveRecovery, 250);
+}
+function saveRecovery() {
+  clearTimeout(recoveryTimer);
+  const revision = recoveryRevision,
+    state = snapshot(),
+    imageSource = source,
+    name = sourceName;
+  if (draftImageSource !== imageSource || !draftImage) {
+    draftImageSource = imageSource;
+    draftImage = new Promise<Blob>((resolve, reject) =>
+      imageSource.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error('Could not save the image.'))),
+        'image/png',
+      ),
+    );
+  }
+  const image = draftImage;
+  recoveryQueue = recoveryQueue
+    .catch(() => {})
+    .then(async () => {
+      try {
+        const blob = await image;
+        if (revision !== recoveryRevision) return;
+        await writeDraft({ version: 1, name, image: blob, ...state, savedAt: Date.now() });
+        savedRevision = revision;
+        if (revision === recoveryRevision)
+          $('draft-status').textContent = 'Draft saved on this device';
+      } catch {
+        draftImage = undefined;
+        if (revision === recoveryRevision)
+          $('draft-status').textContent = 'Draft unavailable — save a project';
+      }
+    });
+}
+function travelHistory(offset: number) {
+  motion.assertIdle();
+  if (exportBusy) throw new Error('Finish or cancel the export before undoing.');
+  const index = historyIndex + offset;
+  if (index < 0 || index >= history.length) return;
+  historyIndex = index;
+  restoringHistory = true;
+  try {
+    const state = history[index];
+    settings = cloneSettings(state.settings);
+    applyOutput(state.output);
+    motion.restoreState(state.motion);
+    syncControls();
+    renderEffects();
+    scheduleRender();
+  } finally {
+    restoringHistory = false;
+  }
+  syncHistory();
+  scheduleRecovery();
 }
 function change(update: (s: Settings) => void, commit = true) {
   update(settings);
   if (commit) persistHistory();
+  else scheduleRecovery();
   syncControls();
   scheduleRender();
 }
@@ -276,7 +398,11 @@ function renderAlgorithms() {
     option.hidden =
       option.value !== settings.algorithm &&
       !!search &&
-      !option.textContent!.toLowerCase().includes(search);
+      !algorithms
+        .find((a) => a[0] === option.value)
+        ?.join(' ')
+        .toLowerCase()
+        .includes(search);
   $<HTMLSelectElement>('algorithm-select').value = settings.algorithm;
   $('algorithm-description').textContent = algorithms.find((a) => a[0] === settings.algorithm)![3];
   stylePicker.sync(settings.algorithm, search);
@@ -435,9 +561,17 @@ function syncControls() {
   if (!document.activeElement?.matches('[data-color]')) renderColors();
   renderAlgorithms();
   const preset = builtinPresets.findIndex(
-    (p) => JSON.stringify(p.settings) === JSON.stringify(settings),
+    (p) =>
+      JSON.stringify(validateSettings(p.settings)) === JSON.stringify(validateSettings(settings)),
   );
   $<HTMLSelectElement>('builtin-preset').value = preset < 0 ? 'custom' : String(preset);
+  lookPicker.sync(preset);
+  document.querySelectorAll<HTMLInputElement>('[data-number-for]').forEach((input) => {
+    const slider = $<HTMLInputElement>(input.dataset.numberFor!);
+    input.value = slider.value;
+    input.disabled = slider.disabled;
+    input.closest<HTMLElement>('.slider-label')!.hidden = slider.hidden;
+  });
   syncHistory();
   updateExportNote();
 }
@@ -463,7 +597,10 @@ async function runWorker(
   }
 }
 function scheduleRender() {
+  invalidateProof();
+  updateExportNote();
   stylePicker.setSource(source);
+  lookPicker.setSource(source);
   if (motion.active) {
     clearTimeout(renderTimer);
     ++renderVersion;
@@ -550,6 +687,7 @@ async function loadImage(file: Blob, name: string) {
     ++renderVersion;
     previewAbort?.abort();
     await motion.open(file);
+    newDocument();
     return;
   }
   const version = ++importVersion,
@@ -558,9 +696,7 @@ async function loadImage(file: Blob, name: string) {
   motion.reset();
   source = canvas;
   sourceName = name;
-  history = [cloneSettings(settings)];
-  historyIndex = 0;
-  syncHistory();
+  newDocument();
   scheduleRender();
   toast('Image opened. Make something good.');
 }
@@ -598,28 +734,115 @@ function updateZoom() {
       1,
       stage.clientHeight - parseFloat(padding.paddingTop) - parseFloat(padding.paddingBottom) - 4,
     );
+  const frame = $('canvas-frame');
+  const preview = $<HTMLCanvasElement>('output-canvas');
+  const border = getComputedStyle(frame);
+  const borderW = parseFloat(border.borderLeftWidth) + parseFloat(border.borderRightWidth);
+  const borderH = parseFloat(border.borderTopWidth) + parseFloat(border.borderBottomWidth);
   const width =
     value === 'fit'
       ? Math.min(availableW, (availableH * source.width) / source.height)
-      : (source.width * Number(value)) / 100;
-  $('canvas-frame').style.width = `${width}px`;
+      : (preview.width * Number(value)) / 100 + borderW;
+  frame.style.width = `${width}px`;
+  frame.style.height =
+    value === 'fit' ? '' : `${(preview.height * Number(value)) / 100 + borderH}px`;
 }
 function updateExportNote() {
-  if (motion.active) {
-    $('export-note').textContent = 'Current-frame export uses the motion Longest side setting.';
-    return;
-  }
-  const ratio = +$<HTMLSelectElement>('export-size').value,
+  if (!documentReady) return;
+  exportPanel.sync(motion.active);
+  const format = $<HTMLSelectElement>('format').value;
+  $('quality-row').hidden = !['jpg', 'webp'].includes(format);
+  $('custom-size').hidden = motion.active || $<HTMLSelectElement>('export-size').value !== 'custom';
+  const ratio = exportRatio(),
     w = Math.max(1, Math.round(source.width * ratio)),
     h = Math.max(1, Math.round(source.height * ratio));
-  const isSVG = $<HTMLSelectElement>('format').value.startsWith('svg');
-  $('export-note').textContent = isSVG
-    ? `${w} × ${h} · actual vector paths${w * h > 1_000_000 ? ' · choose a smaller size (1 MP limit)' : ''}`
-    : `${w} × ${h} · ${ratio === 1 ? 'full resolution' : 'resized before processing'}`;
+  $('export-note').textContent = motion.active
+    ? 'Current-frame export uses the motion Longest side setting.'
+    : `${w} × ${h} · ${format.startsWith('svg') ? 'actual vector paths' : 'output pixels'}${format === 'jpg' ? ' · white background for transparency' : ''}`;
+  let problem = '';
+  let signature = '';
+  try {
+    if (motion.active) {
+      const info = motion.exportInfo();
+      $('export-summary').textContent =
+        `${info.width} × ${info.height} · ${info.duration.toFixed(2)} seconds · ${info.fps} FPS · ${info.frames} frames`;
+      if (info.pendingVideo) throw new Error('Open the original video to relink before exporting.');
+      if (info.duration > 30 || info.frames > 900)
+        throw new Error('Trim to 30 seconds and at most 900 frames.');
+      assertMotionBudget(
+        info.width,
+        info.height,
+        { ...settings, scale: info.minimumScale },
+        info.frames,
+        info.fps,
+      );
+      if (info.format === 'mp4' || info.format === 'webm') {
+        signature = JSON.stringify(info);
+        if (signature !== codecSignature) {
+          codecSignature = signature;
+          codecProblem = '';
+          const revision = ++codecRevision;
+          $('codec-status').textContent = 'Checking browser video support…';
+          void import('mediabunny')
+            .then(async (m) => {
+              const supported = await m.canEncodeVideo(info.format === 'mp4' ? 'avc' : 'vp8', {
+                width: info.width,
+                height: info.height,
+                frameRate: info.fps,
+              });
+              if (revision !== codecRevision) return;
+              codecProblem = supported
+                ? ''
+                : `${info.format.toUpperCase()} is unavailable here. Choose WebM, GIF or PNG frames.`;
+              $('codec-status').textContent =
+                codecProblem || 'Video encoder available in this browser.';
+              updateExportNote();
+            })
+            .catch(() => {
+              if (revision !== codecRevision) return;
+              codecProblem = 'Could not check video support. Try GIF or PNG frames.';
+              $('codec-status').textContent = codecProblem;
+              updateExportNote();
+            });
+        }
+      }
+    } else {
+      $('export-summary').textContent =
+        `${format.toUpperCase()} · ${w} × ${h}${['jpg', 'webp'].includes(format) ? ` · ${$<HTMLInputElement>('export-quality').value}% quality` : ''}`;
+      if (!Number.isFinite(ratio) || ratio <= 0 || w > 8192 || h > 8192 || w * h > 16_000_000)
+        throw new Error('Choose dimensions up to 8192 px per side and 16 megapixels.');
+      if (format.startsWith('svg') && w * h > 1_000_000)
+        throw new Error('Choose a smaller size for SVG (1 megapixel limit).');
+      assertProcessingSize(w, h, settings);
+    }
+  } catch (error) {
+    problem = error instanceof Error ? error.message : 'Check output settings.';
+  }
+  if (!signature) {
+    ++codecRevision;
+    codecSignature = '';
+    codecProblem = '';
+    $('codec-status').textContent = '';
+  }
+  $('export-validation').textContent = problem || codecProblem;
+  $<HTMLButtonElement>('download-export').disabled =
+    !!problem || !!codecProblem || exportBusy || motion.busy;
+  if (!exportBusy && !motion.busy)
+    $('download-export').textContent = motion.active ? 'Download animation' : 'Download image';
 }
 async function getExportPixels(signal?: AbortSignal) {
   if (motion.active) return motion.currentFrame(signal);
-  const ratio = +$<HTMLSelectElement>('export-size').value;
+  const ratio = exportRatio();
+  const width = Math.max(1, Math.round(source.width * ratio)),
+    height = Math.max(1, Math.round(source.height * ratio));
+  if (
+    !Number.isFinite(ratio) ||
+    ratio <= 0 ||
+    width > 8192 ||
+    height > 8192 ||
+    width * height > 16_000_000
+  )
+    throw new Error('Choose dimensions up to 8192 px per side and 16 megapixels.');
   assertProcessingSize(
     Math.max(1, Math.round(source.width * ratio)),
     Math.max(1, Math.round(source.height * ratio)),
@@ -636,8 +859,10 @@ async function exportImage(copy = false, frame = false) {
   if (exportBusy) return;
   const format = copy ? 'png' : $<HTMLSelectElement>('format').value;
   const filename = exportName(format.startsWith('svg') ? 'svg' : format);
-  const ratio = +$<HTMLSelectElement>('export-size').value;
+  const quality = Number($<HTMLInputElement>('export-quality').value) / 100;
+  const ratio = exportRatio();
   if (
+    !motion.active &&
     format.startsWith('svg') &&
     Math.round(source.width * ratio) * Math.round(source.height * ratio) > 1_000_000
   )
@@ -647,13 +872,15 @@ async function exportImage(copy = false, frame = false) {
   $('cancel-image-export').hidden = false;
   $<HTMLButtonElement>('export').disabled = true;
   $<HTMLButtonElement>('copy-image').disabled = true;
-  $('export').innerHTML = `Developing… <span class="spinner"></span>`;
+  $('download-export').textContent = 'Rendering image…';
+  $<HTMLButtonElement>('download-export').disabled = true;
+  $('image-export-status').textContent = 'Rendering at the selected output dimensions…';
   try {
     // ClipboardItem accepts a promise, preserving transient user activation on Safari.
     const blobPromise = getExportPixels(imageExportAbort.signal).then((p) =>
       format.startsWith('svg')
         ? new Blob([svgImage(p, format === 'svg-black')], { type: 'image/svg+xml' })
-        : rasterBlob(p, format),
+        : rasterBlob(p, format, quality),
     );
     if (copy) {
       if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
@@ -666,8 +893,17 @@ async function exportImage(copy = false, frame = false) {
       const blob = await blobPromise;
       imageExportAbort.signal.throwIfAborted();
       download(blob, filename);
+      $('image-export-status').textContent =
+        `Downloaded ${filename} · ${(blob.size / 1024).toFixed(0)} KB`;
       toast('Your pixels are ready.');
     }
+  } catch (error) {
+    $('image-export-status').textContent = imageExportAbort?.signal.aborted
+      ? 'Export cancelled.'
+      : error instanceof Error
+        ? error.message
+        : 'Export failed.';
+    throw error;
   } finally {
     exportBusy = false;
     imageExportAbort = null;
@@ -676,6 +912,7 @@ async function exportImage(copy = false, frame = false) {
     $<HTMLButtonElement>('copy-image').disabled = false;
     $('export').innerHTML =
       `${motion.active ? 'Export animation' : 'Export image'} ${icon('download')}`;
+    updateExportNote();
   }
 }
 function savedPresets(): { name: string; settings: Settings }[] {
@@ -714,6 +951,11 @@ function openDialog(id: string) {
   $<HTMLDialogElement>(id).showModal();
 }
 const motion = new MotionEditor({
+  changed: () => {
+    persistHistory();
+    if (documentReady) updateExportNote();
+  },
+  previewChanged: invalidateProof,
   settings: () => settings,
   source: () => source,
   setSource: (canvas, name) => {
@@ -777,6 +1019,13 @@ function selectAlgorithm(id: AlgorithmId) {
       s.colorMode = 'palette';
   });
 }
+const workspace = setupWorkspace();
+const exportPanel = setupExportPanel();
+if (document.body.classList.contains('show-advanced'))
+  document
+    .querySelectorAll<HTMLDetailsElement>('#output-section details')
+    .forEach((el) => (el.open = true));
+const lookPicker = new LookPicker(workspace.looks, builtinPresets, applySettings);
 const stylePicker = new StylePicker($('style-gallery'), selectAlgorithm);
 stylePicker.setSource(source);
 $<HTMLSelectElement>('algorithm-select').onchange = () =>
@@ -878,24 +1127,8 @@ document
 $('compare').oninput = () => updateSplit();
 $('zoom').onchange = () => updateZoom();
 new ResizeObserver(updateZoom).observe($('drop-zone'));
-bind('undo', () => {
-  if (historyIndex > 0) {
-    settings = cloneSettings(history[--historyIndex]);
-    syncControls();
-    renderAlgorithms();
-    renderEffects();
-    scheduleRender();
-  }
-});
-bind('redo', () => {
-  if (historyIndex < history.length - 1) {
-    settings = cloneSettings(history[++historyIndex]);
-    syncControls();
-    renderAlgorithms();
-    renderEffects();
-    scheduleRender();
-  }
-});
+bind('undo', () => travelHistory(-1));
+bind('redo', () => travelHistory(1));
 bind('upload', () => $('image-input').click());
 $<HTMLInputElement>('image-input').onchange = (e) =>
   safely(async () => {
@@ -914,6 +1147,7 @@ bind('sample', () => {
   ++importVersion;
   source = makeSample();
   sourceName = 'Orbital study';
+  newDocument();
   scheduleRender();
 });
 let dragDepth = 0;
@@ -1004,10 +1238,88 @@ bind('cancel-preview', () => {
   $('render-status').classList.remove('rendering');
   $('cancel-preview').hidden = true;
 });
-bind('export', () => exportImage());
+bind('export', () => {
+  exportPanel.open();
+  updateExportNote();
+});
+bind('download-export', () => exportImage());
 bind('copy-image', () => exportImage(true));
-$('format').onchange = updateExportNote;
-$('export-size').onchange = updateExportNote;
+const changeOutput = () => {
+  invalidateProof();
+  persistHistory();
+  updateExportNote();
+};
+$('format').onchange = changeOutput;
+$<HTMLInputElement>('motion-audio').onchange = changeOutput;
+$('export-quality').onchange = () => {
+  const input = $<HTMLInputElement>('export-quality');
+  input.value = String(Math.max(1, Math.min(100, Number(input.value) || 94)));
+  changeOutput();
+};
+$('export-size').onchange = () => {
+  if ($<HTMLSelectElement>('export-size').value === 'custom') {
+    $<HTMLInputElement>('export-width').value = String(source.width);
+    $<HTMLInputElement>('export-height').value = String(source.height);
+  }
+  changeOutput();
+};
+for (const axis of ['width', 'height'] as const)
+  $('export-' + axis).onchange = () => {
+    const input = $<HTMLInputElement>('export-' + axis);
+    const value = Math.round(Number(input.value));
+    if (!Number.isFinite(value) || value < 1 || value > 8192) {
+      input.value = String(source[axis]);
+    }
+    const ratio = Number(input.value) / source[axis];
+    if (
+      source.width * ratio > 8192 ||
+      source.height * ratio > 8192 ||
+      Math.round(source.width * ratio) * Math.round(source.height * ratio) > 16_000_000
+    ) {
+      applyOutput(history[historyIndex].output);
+      toast('Choose dimensions up to 8192 px per side and 16 megapixels.', true);
+      return;
+    }
+    const other = axis === 'width' ? 'height' : 'width';
+    $<HTMLInputElement>('export-' + other).value = String(
+      Math.max(1, Math.round(source[other] * ratio)),
+    );
+    changeOutput();
+  };
+bind('close-proof', invalidateProof);
+bind('inspect-output', async () => {
+  motion.assertIdle();
+  invalidateProof();
+  const controller = new AbortController();
+  proofAbort = controller;
+  $('output-proof').hidden = false;
+  $('proof-status').textContent = 'Rendering selected output size…';
+  $<HTMLButtonElement>('inspect-output').disabled = true;
+  try {
+    const pixels = await getExportPixels(controller.signal);
+    if (proofAbort !== controller || controller.signal.aborted) return;
+    const canvas = $<HTMLCanvasElement>('proof-canvas');
+    canvas.width = pixels.width;
+    canvas.height = pixels.height;
+    canvas
+      .getContext('2d')!
+      .putImageData(
+        new ImageData(new Uint8ClampedArray(pixels.data), pixels.width, pixels.height),
+        0,
+        0,
+      );
+    $('proof-status').textContent =
+      `${pixels.width} × ${pixels.height} · one output pixel per CSS pixel. Scroll to inspect. Before file encoding.`;
+  } catch (error) {
+    if (!controller.signal.aborted)
+      $('proof-status').textContent = error instanceof Error ? error.message : 'Inspection failed.';
+  } finally {
+    if (proofAbort === controller) {
+      proofAbort = null;
+      $<HTMLButtonElement>('inspect-output').disabled = false;
+    }
+  }
+});
 bind('reset', () => applySettings(cloneSettings(defaults)));
 bind('shuffle', () => {
   const p = cloneSettings(
@@ -1073,6 +1385,7 @@ bind('share', async () => {
 });
 bind('save-project', async () => {
   const animation = motion.project();
+  const outputSettings = readOutput(source.width, source.height);
   const recipe = cloneSettings(settings),
     name = sourceName,
     filename = exportName('d4a'),
@@ -1090,6 +1403,7 @@ bind('save-project', async () => {
             version: 1,
             name,
             settings: recipe,
+            output: outputSettings,
             image: reader.result,
             ...(animation ? { motion: animation } : {}),
           }),
@@ -1123,8 +1437,8 @@ $<HTMLInputElement>('project-input').onchange = (e) =>
     source = canvas;
     sourceName = project.name;
     settings = project.settings;
-    history = [cloneSettings(settings)];
-    historyIndex = 0;
+    applyOutput(project.output);
+
     syncControls();
     renderAlgorithms();
     renderEffects();
@@ -1132,6 +1446,7 @@ $<HTMLInputElement>('project-input').onchange = (e) =>
     input.value = '';
     if (project.motion) motion.restore(project.motion);
     else toast('Project opened.');
+    newDocument();
   });
 bind('fullscreen', async () => {
   if (document.fullscreenElement) await document.exitFullscreen();
@@ -1216,14 +1531,114 @@ try {
   if (location.hash.startsWith('#recipe=')) {
     if (location.hash.length > 16000) throw new Error('That settings link is too long.');
     settings = validateSettings(JSON.parse(decodeURIComponent(location.hash.slice(8))));
-    history = [cloneSettings(settings)];
   }
 } catch (error) {
   fail(error);
 }
+history = [snapshot()];
+documentReady = true;
+document.querySelectorAll<HTMLInputElement>('[data-setting]').forEach((slider) => {
+  const label = document.querySelector<HTMLLabelElement>(`label[for="${slider.id}"]`)!;
+  const value = document.createElement('input');
+  value.type = 'number';
+  value.className = 'slider-number';
+  value.min = slider.min;
+  value.max = slider.max;
+  value.step = slider.step;
+  value.setAttribute('aria-label', `${slider.getAttribute('aria-label')} value`);
+  value.dataset.numberFor = slider.id;
+  label.querySelector('output')!.hidden = true;
+  const heading = document.createElement('div');
+  heading.className = 'slider-label';
+  label.classList.remove('slider-label');
+  label.before(heading);
+  heading.append(label, value);
+  label.title = 'Double-click to reset this adjustment';
+  value.onchange = () => {
+    const n = value.valueAsNumber;
+    if (!Number.isFinite(n) || !value.checkValidity()) {
+      value.value = slider.value;
+      return;
+    }
+    slider.value = String(n);
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  label.ondblclick = () => {
+    slider.value = String(defaults[slider.dataset.setting as keyof Settings]);
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+});
 syncControls();
 renderAlgorithms();
 renderEffects();
 renderSavedPresets();
+
+bind('restore-draft', async () => {
+  if (!pendingDraft) return;
+  motion.assertIdle();
+  const draft = pendingDraft,
+    version = ++importVersion;
+  const canvas = await decodeImage(draft.image, false);
+  if (version !== importVersion || pendingDraft !== draft) return;
+  restoringHistory = true;
+  try {
+    motion.reset();
+    source = canvas;
+    sourceName = draft.name;
+    settings = cloneSettings(draft.settings);
+    applyOutput(draft.output);
+    motion.restoreState(draft.motion);
+    syncControls();
+    renderEffects();
+    scheduleRender();
+  } finally {
+    restoringHistory = false;
+  }
+  newDocument();
+  toast(
+    draft.motion.project?.video
+      ? 'Draft restored. Open the original video to relink.'
+      : 'Draft restored.',
+  );
+});
+bind('discard-draft', async () => {
+  // Serialize deletion with writes so an earlier save cannot resurrect the draft.
+  const revision = ++recoveryRevision;
+  clearTimeout(recoveryTimer);
+  pendingDraft = undefined;
+  $('recovery-banner').hidden = true;
+  recoveryQueue = recoveryQueue.catch(() => {}).then(() => deleteDraft());
+  await recoveryQueue;
+  savedRevision = revision;
+  if (revision === recoveryRevision) $('draft-status').textContent = 'Draft discarded';
+});
+void readDraft()
+  .then((draft) => {
+    if (!draft || recoveryRevision || location.hash.startsWith('#recipe=')) return;
+    pendingDraft = draft;
+    $('recovery-message').textContent = `Continue “${draft.name}”? A local draft is available.`;
+    $('recovery-banner').hidden = false;
+    $('draft-status').textContent = 'Previous draft available';
+  })
+  .catch(() => {
+    if (!recoveryRevision) {
+      $('draft-status').textContent = 'Draft unavailable — save a project';
+      $('recovery-message').textContent =
+        'The previous draft could not be read. You can discard it or open a project backup.';
+      $('restore-draft').hidden = true;
+      $('recovery-banner').hidden = false;
+    }
+  });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && recoveryRevision !== savedRevision) saveRecovery();
+});
+window.addEventListener('beforeunload', (event) => {
+  if (recoveryRevision !== savedRevision) {
+    event.preventDefault();
+    event.returnValue = '';
+  }
+});
 
 scheduleRender();

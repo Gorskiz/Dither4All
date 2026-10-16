@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
@@ -18,6 +19,7 @@ test('image editor processes locally, compares, edits, undoes, and exports real 
       externalRequests.push(r.url());
   });
   await page.goto('/');
+  await openAdvanced(page);
   await expect(page.locator('#render-status')).toContainText('ms');
   await page.screenshot({ path: 'test-results/overview.png', fullPage: true });
   await expect(page.locator('#output-canvas')).toHaveAttribute('width', '1100');
@@ -43,7 +45,7 @@ test('image editor processes locally, compares, edits, undoes, and exports real 
     await page.getByLabel('Format', { exact: true }).selectOption(format);
     await page.getByLabel('Size', { exact: true }).selectOption('.5');
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export image', exact: true }).click();
+    await page.getByRole('button', { name: 'Download image', exact: true }).click();
     const file = await download,
       path = await file.path(),
       data = await readFile(path!);
@@ -65,6 +67,7 @@ test('image editor processes locally, compares, edits, undoes, and exports real 
 
 test('project round trip, malformed input, palette import, and image batch', async ({ page }) => {
   await page.goto('/');
+  await openAdvanced(page);
   await expect(page.locator('#render-status')).toContainText('ms');
   const saved = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Save project', exact: true }).click();
@@ -108,6 +111,7 @@ test('continuous inspector exposes core tools together without editing dialogs',
   page,
 }) => {
   await page.goto('/');
+  await openAdvanced(page);
   await expect(page.locator('#render-status')).toContainText('ms');
   await expect(page.getByRole('tablist')).toHaveCount(0);
   for (const name of ['Style', 'Palette', 'Brightness', 'Contrast'])
@@ -125,8 +129,8 @@ test('continuous inspector exposes core tools together without editing dialogs',
     .analyze();
   expect(withEffect.violations).toEqual([]);
   await page.getByLabel('Style', { exact: true }).selectOption('cmyk');
-  await expect(page.getByLabel('Dither strength')).toBeDisabled();
-  await expect(page.getByLabel('Pattern size')).toBeEnabled();
+  await expect(page.getByLabel('Dither strength', { exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Pattern size', { exact: true })).toBeEnabled();
   await expect(page.locator('#cmyk-note')).toBeVisible();
   await expect(page.getByLabel('Mode', { exact: true })).toBeDisabled();
 });
@@ -136,6 +140,7 @@ test('mobile adjustments keep the image visible above the continuous inspector',
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
+  await openAdvanced(page);
   await expect(page.locator('#render-status')).toContainText('ms');
   await page.getByLabel('Contrast', { exact: true }).fill('35');
   await expect(page.locator('#render-status')).toContainText('ms');
@@ -151,6 +156,7 @@ test('canvas and inspector share the viewport at desktop, tablet, and phone size
   page,
 }) => {
   await page.goto('/');
+  await openAdvanced(page);
   await expect(page.locator('#render-status')).toContainText('ms');
   for (const [width, height] of [
     [1920, 1080],

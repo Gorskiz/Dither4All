@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect, type Page } from '@playwright/test';
 
 const valuesKey = 'dither4all-motion-preset-controls';
@@ -37,6 +38,7 @@ test('values and locks restore together with matching thumbnails, and resets/ran
   test.setTimeout(60_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
+  await openAdvanced(page);
   await animate(page);
   await page.getByRole('slider', { name: 'Preset strength', exact: true }).fill('87');
   await page.getByRole('slider', { name: 'Preset speed', exact: true }).fill('115');
@@ -117,6 +119,7 @@ test('invalid values keep valid locks and session edits recover after storage fa
     { valuesKey, locksKey },
   );
   await page.goto('/');
+  await openAdvanced(page);
   await animate(page);
   await expectControls(page, { strength: 100, speed: 1, phase: 0, reverse: false });
   await expect(

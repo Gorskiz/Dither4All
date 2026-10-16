@@ -1497,3 +1497,422 @@ dialog > a {
 .motion-preset-direction .toggle-row {
   flex: 1;
 }
+
+/* Document recovery remains visible without covering the canvas or controls. */
+.recovery-banner {
+  display: flex;
+  flex-shrink: 0;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--accent);
+  background: #273849;
+}
+.recovery-banner span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+#draft-status {
+  order: 3;
+  margin-left: auto;
+  color: var(--muted);
+  text-transform: none;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.document-kind {
+  order: 4;
+}
+@media (max-width: 720px) {
+  .recovery-banner {
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    gap: 6px;
+  }
+  .recovery-banner span {
+    flex-basis: 100%;
+  }
+  .document-bar {
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding-block: 4px;
+  }
+  #draft-status {
+    flex-basis: 100%;
+    font-size: 11px;
+  }
+  .document-kind {
+    display: none;
+  }
+}
+
+/* A compact creative path, with full controls a deliberate step away. */
+.section-nav {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+  background: #252930;
+}
+.section-nav button {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 2px;
+  font-size: 12px;
+  border-radius: 0;
+}
+.advanced-toggle {
+  text-align: left;
+  padding: 7px 17px;
+  color: var(--muted);
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.tool-details {
+  margin: 10px 0;
+  padding: 0;
+  min-width: 0;
+}
+.tool-details > summary {
+  cursor: pointer;
+  padding: 10px 0;
+  font-size: 13px;
+  color: var(--ink);
+}
+.tool-details[open] > summary {
+  color: var(--accent);
+}
+.advanced-only {
+  display: none;
+}
+.show-advanced .advanced-only {
+  display: inline-flex;
+}
+.image-looks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+.image-look {
+  padding: 5px;
+  border: 1px solid var(--line);
+  background: var(--canvas);
+  text-align: left;
+  min-width: 0;
+}
+.image-look canvas {
+  width: 100%;
+  height: 72px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  display: block;
+  margin-bottom: 7px;
+}
+.image-look strong,
+.image-look span {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 0 3px;
+}
+.image-look strong {
+  font-size: 13px;
+  line-height: 1.4;
+}
+.image-look span {
+  font-size: 11px;
+  color: var(--muted);
+  padding-bottom: 5px;
+  text-transform: capitalize;
+}
+.image-look[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.image-look:hover {
+  border-color: var(--accent);
+}
+.hint,
+.field-row > label,
+.slider-label,
+.toggle-row {
+  font-size: 12px;
+}
+.panel-section h2 {
+  font-size: 14px;
+}
+.control-section {
+  grid-template-columns: 155px minmax(0, 1fr);
+  gap: 10px;
+}
+.slider-label {
+  gap: 5px;
+}
+.slider-number {
+  width: 55px;
+  min-width: 0;
+  font-size: 12px;
+  padding: 5px 3px !important;
+}
+.style-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin: 10px 0;
+}
+.style-filters select {
+  flex: 1;
+  min-width: 0;
+}
+.style-filters label:first-child {
+  flex-basis: 100%;
+}
+.style-filters .toggle-row {
+  margin: 0;
+}
+.style-filters button {
+  border: 1px solid var(--line);
+  padding: 7px;
+}
+.file-menu-toggle {
+  display: none;
+}
+@media (min-width: 1001px) {
+  .editor-layout {
+    grid-template-columns: minmax(0, 1fr) 370px;
+  }
+}
+@media (max-width: 720px) {
+  .site-header {
+    min-height: 48px;
+    height: 48px;
+    position: relative;
+    overflow: visible;
+    z-index: 8;
+  }
+  .file-menu-toggle {
+    display: block;
+    margin-left: auto;
+    min-width: 48px;
+  }
+  .site-header .document-actions {
+    display: none;
+    position: absolute;
+    right: 60px;
+    top: 45px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 8px;
+    box-shadow: 0 8px 24px #0008;
+  }
+  .site-header .document-actions.menu-open {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .site-header .header-links {
+    margin-left: 0;
+  }
+  .site-header button,
+  .document-actions button,
+  .header-links button {
+    min-height: 44px;
+    font-size: 13px;
+    padding: 6px 10px;
+  }
+  .editor-layout {
+    grid-template-rows: minmax(240px, 40%) minmax(0, 1fr);
+  }
+  .preview-toolbar {
+    min-height: 44px;
+  }
+  .preview-toolbar button {
+    min-height: 40px;
+    min-width: 40px;
+    font-size: 12px;
+  }
+  .canvas-bottom {
+    min-height: 44px;
+    padding: 0 10px;
+    gap: 6px;
+  }
+  .canvas-bottom button,
+  .canvas-bottom select {
+    min-height: 40px;
+    font-size: 12px;
+  }
+  .canvas-bottom #dimensions {
+    font-size: 10px;
+  }
+  .canvas-stage {
+    padding: 4px 12px;
+  }
+  .inspector-actions {
+    padding: 6px 10px;
+  }
+  .inspector-actions > button {
+    min-height: 44px;
+    font-size: 13px;
+  }
+  .section-nav button {
+    min-height: 44px;
+    font-size: 12px;
+  }
+  .advanced-toggle {
+    min-height: 36px;
+  }
+  .inspector-body button,
+  .inspector-body summary,
+  .inspector-body select {
+    min-height: 44px;
+  }
+  .inspector-body .field-row select,
+  .inspector-body input[type='number'] {
+    font-size: 16px;
+  }
+  .inspector-body .field-row {
+    flex-wrap: wrap;
+  }
+  .inspector-body .field-row > label {
+    font-size: 13px;
+  }
+  .control-section {
+    grid-template-columns: minmax(145px, 1fr) minmax(70px, 1fr);
+    gap: 12px;
+  }
+  .slider-label {
+    font-size: 13px;
+  }
+  input[type='range'] {
+    height: 28px;
+    background: linear-gradient(var(--line), var(--line)) center / 100% 4px no-repeat;
+  }
+  input[type='range']::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+  }
+  input[type='range']::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+  }
+  input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+  }
+  .toggle-row {
+    min-height: 44px;
+  }
+  .image-look canvas {
+    height: 80px;
+  }
+  .recovery-banner button {
+    min-height: 44px;
+  }
+  .transport {
+    flex-wrap: wrap;
+  }
+  .transport button {
+    min-height: 40px;
+    min-width: 36px;
+  }
+  .preview-status {
+    font-size: 10px;
+  }
+}
+#output-section {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+#export-panel > summary {
+  font-weight: 600;
+}
+.export-panel-actions {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+.export-panel-actions button {
+  min-height: 40px;
+  padding: 9px;
+}
+.export-validation:not(:empty) {
+  padding: 10px;
+  border-left: 2px solid var(--orange);
+  background: #ffc08b0a;
+  color: var(--orange);
+  font-size: 12px;
+}
+.custom-size {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.custom-size label {
+  min-width: 0;
+  font-size: 12px;
+}
+.custom-size input {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+}
+.custom-size p {
+  grid-column: 1 / -1;
+}
+#export-quality {
+  width: 75px;
+}
+#output-proof {
+  margin: 12px 0;
+}
+#output-proof .section-title {
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.proof-viewport {
+  width: 100%;
+  max-height: 350px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: var(--canvas);
+}
+#proof-canvas {
+  display: block;
+  max-width: none;
+  image-rendering: pixelated;
+}
+#image-export-status,
+#motion-export-status {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) {
+  .export-panel-actions button {
+    min-height: 44px;
+  }
+}
+/* Minimum pointer targets also apply to compact desktop utility actions. */
+button {
+  min-height: 24px;
+  min-width: 24px;
+}
+/* Explicit fallbacks keep controls legible while WebKit resolves inherited theme colors. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-text-fill-color: var(--ink, #e9ecf1);
+  color: var(--ink, #e9ecf1);
+  padding-right: 25px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23aeb7c5' stroke-width='1.5'%3E%3Cpath d='m3 4 3 3 3-3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+.zoom-label {
+  color: var(--muted, #aeb7c5);
+  -webkit-text-fill-color: var(--muted, #aeb7c5);
+}
+.slider-label > label {
+  min-width: 0;
+}

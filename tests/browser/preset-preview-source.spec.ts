@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
@@ -37,6 +38,7 @@ test('uploaded images automatically refresh built-in and custom previews with th
   test.setTimeout(60_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
+  await openAdvanced(page);
   await imageFile(page, '#ff0000', 80, 160);
   await page.getByLabel('Mode', { exact: true }).selectOption('rgb');
   await page.getByLabel('Contrast', { exact: true }).fill('0');

@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
@@ -19,6 +20,7 @@ test('preset phase previews a shifted start, wraps full turns, and applies/share
   test.setTimeout(90_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await page.getByLabel('Longest side', { exact: true }).selectOption('128');
   const slider = page.getByRole('slider', { name: 'Preset phase', exact: true });

@@ -1,3 +1,4 @@
+import { openAdvanced } from './helpers';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
@@ -35,6 +36,7 @@ test('reverse previews the original direction with speed/strength, applies once,
 }) => {
   test.setTimeout(90_000);
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await page.getByLabel('Longest side', { exact: true }).selectOption('128');
   await page.getByRole('slider', { name: 'Preset speed', exact: true }).fill('150');
@@ -112,6 +114,7 @@ test('reverse previews the original direction with speed/strength, applies once,
 test('reduced motion uses reversed posters and preserves the pause setting', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
+  await openAdvanced(page);
   await page.getByRole('button', { name: 'Animate image', exact: true }).click();
   await page.getByRole('slider', { name: 'Preset speed', exact: true }).fill('150');
   const card = page.locator('[data-motion-preset="liquid-ink"]');

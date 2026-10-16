@@ -1,3 +1,4 @@
+import { validateOutput, type OutputSettings } from './output-settings';
 import { validateTimeline } from './motion/model';
 import type { MotionProject } from './motion/editor';
 import { validateSettings, type Settings } from './engine/catalog';
@@ -35,8 +36,9 @@ export function canvasPixels(canvas: HTMLCanvasElement): Pixels {
       .getImageData(0, 0, canvas.width, canvas.height).data,
   };
 }
-export async function decodeImage(file: Blob): Promise<HTMLCanvasElement> {
-  if (file.size > MAX_FILE_BYTES) throw new Error('Choose an image smaller than 50 MB.');
+export async function decodeImage(file: Blob, enforceFileLimit = true): Promise<HTMLCanvasElement> {
+  if (enforceFileLimit && file.size > MAX_FILE_BYTES)
+    throw new Error('Choose an image smaller than 50 MB.');
   const bitmap = await createImageBitmap(file);
   try {
     if (bitmap.width * bitmap.height > MAX_PIXELS || bitmap.width > 8192 || bitmap.height > 8192)
@@ -112,6 +114,7 @@ export interface Project {
   settings: Settings;
   image: string;
   motion?: MotionProject;
+  output?: OutputSettings;
 }
 export function readProject(text: string): Project {
   let p: unknown;
@@ -131,6 +134,8 @@ export function readProject(text: string): Project {
     throw new Error('Unsupported project format.');
   if (project.motion) {
     const motion = project.motion;
+    if (motion.active !== undefined && typeof motion.active !== 'boolean')
+      throw new Error('Invalid animation view.');
     motion.timeline = validateTimeline(motion.timeline, motion.duration);
     if (
       motion.video &&
@@ -147,6 +152,7 @@ export function readProject(text: string): Project {
     ...project,
     name: project.name.slice(0, 160),
     settings: validateSettings(project.settings),
+    output: validateOutput(project.output),
   };
 }
 export function parsePalette(text: string): string[] {
