@@ -85,6 +85,7 @@ export class MotionEditor {
   private openVersion = 0;
   private lookPreviews: MotionPresetPreviews;
   private previewCurrentImage = false;
+  private presetStrength = 100;
   private importingPresets = false;
   private savedMotionPresets: SavedMotionPreset[] = [];
   private presetEdit: { kind: 'save' } | { kind: 'rename'; id: string } | null = null;
@@ -110,6 +111,9 @@ export class MotionEditor {
         <div class="section-title motion-subheading"><h3>Animation looks</h3><button id="motion-preview-toggle" class="small-link" type="button">Pause previews</button></div>
         <label class="toggle-row motion-preview-source"><input id="motion-preview-current" type="checkbox"> Use current image for preset previews</label>
         <p class="hint" id="motion-preview-source-note">Uses the sample image and a fixed palette for all preset previews.</p>
+        <div class="field-row motion-preset-strength"><label for="motion-preset-strength">Preset strength</label><output id="motion-preset-strength-value" for="motion-preset-strength">100%</output><button id="motion-preset-strength-reset" class="small-link" type="button" aria-label="Reset preset strength">Reset</button></div>
+        <input id="motion-preset-strength" class="motion-strength-slider" type="range" min="0" max="200" step="1" value="100" aria-valuetext="100%" aria-describedby="motion-preset-strength-help">
+        <p class="hint" id="motion-preset-strength-help">0% removes motion · 100% original · 200% boosted. Updates all preset previews; apply a look to change the stack. Effect amounts cap at 100.</p>
         <p class="hint" id="motion-looks-help">Previews show each look without applying it. One click replaces source motion and the stack. Your image settings, trim and keyframes stay as they are.</p>
         <div class="motion-looks" role="group" aria-label="Animation looks" aria-describedby="motion-looks-help">${motionPresets.map((p) => `<button type="button" class="motion-look" data-motion-preset="${p.id}" aria-pressed="false"><strong>${p.name}</strong><span>${p.description}</span></button>`).join('')}</div>
         <div class="section-title motion-subheading"><h3>Your animation presets</h3><button id="motion-preset-save" class="small-link" aria-label="Save animation preset">Save</button></div>
@@ -124,7 +128,7 @@ export class MotionEditor {
         <form id="motion-preset-form" class="inline-preset" hidden><label class="field-label" for="motion-preset-name">Animation preset name</label><input id="motion-preset-name" maxlength="60" required><div class="two-buttons"><button type="submit" class="outline-button" id="motion-preset-submit">Save</button><button type="button" id="motion-preset-cancel">Cancel</button></div></form>
         <p id="motion-preset-status" class="hint" role="status"></p>
         <div class="field-row"><label for="motion-effect">Source motion</label><select id="motion-effect"><option value="none">None · source movement</option><option value="boil">Noise boil</option><option value="pulse">Brightness pulse</option><option value="zoom">Looping zoom</option><option value="pan">Horizontal drift</option></select></div>
-        <div class="field-row"><label for="motion-amount">Amount</label><input id="motion-amount" type="range" min="0" max="100" value="35"></div>
+        <div class="field-row"><label for="motion-amount">Amount</label><input id="motion-amount" type="range" min="0" max="100" step="any" value="35"></div>
         <div class="field-row"><label for="motion-cycles">Cycles</label><input id="motion-cycles" type="number" min="1" max="8" value="1"></div>
         <div class="section-title motion-subheading"><h3>Motion stack</h3><span id="motion-stack-count" class="count">0 / 8</span></div>
         <p class="hint">Applied top to bottom after dithering. Combine up to eight effects.</p>
@@ -174,6 +178,18 @@ export class MotionEditor {
       this.previewCurrentImage = el<HTMLInputElement>('motion-preview-current').checked;
       this.syncPreviewSource();
     };
+    const setPresetStrength = (value: number) => {
+      if (this.busy) return;
+      this.presetStrength = value;
+      el<HTMLInputElement>('motion-preset-strength').value = String(value);
+      el('motion-preset-strength').setAttribute('aria-valuetext', `${value}%`);
+      el('motion-preset-strength-value').textContent = `${value}%`;
+      this.lookPreviews.setStrength(value);
+      this.syncPresets();
+    };
+    el<HTMLInputElement>('motion-preset-strength').oninput = () =>
+      setPresetStrength(number('motion-preset-strength'));
+    bind('motion-preset-strength-reset', () => setPresetStrength(100));
     bind('animate-image', () => this.animate());
     bind('motion-close', () => {
       this.assertIdle();
@@ -235,11 +251,14 @@ export class MotionEditor {
             throw new Error('This animation look requires Palette color mode.');
           const playing = this.playing;
           this.pause();
-          this.t = validateTimeline(applyMotionPreset(this.t, preset.id), this.duration);
+          this.t = validateTimeline(
+            applyMotionPreset(this.t, preset.id, this.presetStrength),
+            this.duration,
+          );
           this.sync();
           this.refresh();
           el('motion-stack-status').textContent =
-            `${preset.name} applied. Source motion and stack replaced.`;
+            `${preset.name} applied at ${this.presetStrength}%. Source motion and stack replaced.`;
           if (playing) this.play();
         } catch (error) {
           this.host.error(error);
@@ -329,11 +348,14 @@ export class MotionEditor {
           throw new Error('This animation preset requires Palette color mode.');
         const playing = this.playing;
         this.pause();
-        this.t = validateTimeline(applyMotionAppearance(this.t, preset.appearance), this.duration);
+        this.t = validateTimeline(
+          applyMotionAppearance(this.t, preset.appearance, this.presetStrength),
+          this.duration,
+        );
         this.sync();
         this.refresh();
         el('motion-preset-status').textContent =
-          `Applied “${preset.name}”. Source motion and stack replaced.`;
+          `Applied “${preset.name}” at ${this.presetStrength}%. Source motion and stack replaced.`;
         if (playing) this.play();
       }),
     );
@@ -625,7 +647,10 @@ export class MotionEditor {
     this.syncSavedPresetControls();
     document.querySelectorAll<HTMLButtonElement>('[data-motion-preset]').forEach((button) => {
       const preset = motionPresets.find((p) => p.id === button.dataset.motionPreset)!;
-      button.setAttribute('aria-pressed', String(matchesMotionPreset(this.t, preset.id)));
+      button.setAttribute(
+        'aria-pressed',
+        String(matchesMotionPreset(this.t, preset.id, this.presetStrength)),
+      );
       button.disabled =
         this.busy || (!!preset.requiresPalette && this.host.settings().colorMode !== 'palette');
     });
@@ -712,7 +737,7 @@ export class MotionEditor {
         input.type = 'number';
         input.min = String(min);
         input.max = String(max);
-        input.step = '1';
+        input.step = property === 'amount' ? 'any' : '1';
         input.value = String(effect[property]);
         input.setAttribute('aria-label', `${name} ${index + 1} ${label}`);
         input.onchange = () => {

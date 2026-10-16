@@ -44,6 +44,7 @@ export class MotionPresetPreviews {
   private currentImage: HTMLCanvasElement | undefined;
   private currentSettings: Settings | undefined;
   private inputSignature = '';
+  private strength = 100;
   private width = WIDTH;
   private height = HEIGHT;
   private origin = performance.now();
@@ -166,6 +167,14 @@ export class MotionPresetPreviews {
         Math.round((this.currentSettings.scale * Math.max(this.width, this.height)) / outputSide),
       );
     }
+    this.invalidateFrames();
+  }
+  setStrength(value: number) {
+    if (this.disposed || this.strength === value) return;
+    this.strength = value;
+    this.invalidateFrames();
+  }
+  private invalidateFrames() {
     for (const p of this.previews) {
       p.revision++;
       p.frames.length = 0;
@@ -247,7 +256,7 @@ export class MotionPresetPreviews {
         const deadline = setTimeout(() => abort.abort(), 1500);
         try {
           if (!this.currentImage) this.sample ??= makeSample();
-          const t = applyMotionAppearance(timelineDefaults(4), p.appearance);
+          const t = applyMotionAppearance(timelineDefaults(4), p.appearance, this.strength);
           t.fps = PREVIEW_FPS;
           const time = index / PREVIEW_FPS;
           const settings = cloneSettings(this.currentSettings ?? defaults);

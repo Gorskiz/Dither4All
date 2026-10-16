@@ -1469,3 +1469,17 @@ dialog > a {
 .motion-look-preview {
   object-fit: contain;
 }
+
+.motion-preset-strength {
+  margin-top: 10px;
+  gap: 8px;
+}
+.motion-preset-strength output {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.motion-strength-slider {
+  width: 100%;
+  margin: 6px 0;
+}

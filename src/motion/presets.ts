@@ -25,8 +25,24 @@ export function captureMotionAppearance(value: MotionAppearance): MotionAppearan
     effects: validated.effects,
   };
 }
-export function applyMotionAppearance(timeline: Timeline, appearance: MotionAppearance): Timeline {
-  return { ...structuredClone(timeline), ...captureMotionAppearance(appearance) };
+/** Scale original amounts once; speed, phase, ordering and enabled flags stay intact. */
+export function scaleMotionAppearance(value: MotionAppearance, strength = 100): MotionAppearance {
+  if (!Number.isFinite(strength) || strength < 0 || strength > 200)
+    throw new Error('Use a preset strength from 0 to 200%.');
+  const appearance = captureMotionAppearance(value);
+  const scale = (amount: number) => Math.min(100, (amount * strength) / 100);
+  return {
+    ...appearance,
+    amount: scale(appearance.amount),
+    effects: appearance.effects.map((effect) => ({ ...effect, amount: scale(effect.amount) })),
+  };
+}
+export function applyMotionAppearance(
+  timeline: Timeline,
+  appearance: MotionAppearance,
+  strength = 100,
+): Timeline {
+  return { ...structuredClone(timeline), ...scaleMotionAppearance(appearance, strength) };
 }
 
 interface MotionPreset {
@@ -91,23 +107,31 @@ export const motionPresets: readonly MotionPreset[] = [
 ];
 
 /** Apply only motion appearance. Timing, keyframes, loop and FPS are retained. */
-export function applyMotionPreset(timeline: Timeline, id: string): Timeline {
+export function applyMotionPreset(timeline: Timeline, id: string, strength = 100): Timeline {
   const preset = motionPresets.find((p) => p.id === id);
   if (!preset) throw new Error('Unknown motion look.');
-  return applyMotionAppearance(timeline, { ...preset.source, effects: [...preset.effects] });
+  return applyMotionAppearance(
+    timeline,
+    { ...preset.source, effects: [...preset.effects] },
+    strength,
+  );
 }
 
 /** Derive selection from editable settings, so saved projects need no preset identifier. */
-export function matchesMotionPreset(timeline: Timeline, id: string): boolean {
+export function matchesMotionPreset(timeline: Timeline, id: string, strength = 100): boolean {
   const preset = motionPresets.find((p) => p.id === id);
+  if (!preset) return false;
+  const appearance = scaleMotionAppearance(
+    { ...preset.source, effects: [...preset.effects] },
+    strength,
+  );
   return (
-    !!preset &&
-    timeline.effect === preset.source.effect &&
-    timeline.amount === preset.source.amount &&
-    timeline.cycles === preset.source.cycles &&
-    timeline.effects.length === preset.effects.length &&
+    timeline.effect === appearance.effect &&
+    timeline.amount === appearance.amount &&
+    timeline.cycles === appearance.cycles &&
+    timeline.effects.length === appearance.effects.length &&
     timeline.effects.every((e, i) => {
-      const p = preset.effects[i];
+      const p = appearance.effects[i];
       return (
         e.type === p.type &&
         e.enabled === p.enabled &&
