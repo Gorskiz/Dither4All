@@ -1,15 +1,16 @@
 import { algorithms, cloneSettings, defaults, type AlgorithmId } from './engine/catalog';
 import { FrameProcessor } from './motion/processor';
-import { makeSample } from './sample';
 
-/** A fixed sample makes previews comparable and keeps media/recipe edits out of the queue. */
+/** Compare styles on a tiny copy of the current source, with one bounded worker queue. */
 export class StylePicker {
   private processor = new FrameProcessor();
   private visible = new Set<HTMLButtonElement>();
   private observer: IntersectionObserver;
   private running = false;
   private disposed = false;
-  private sample: ImageData | undefined;
+  private image: ImageData | undefined;
+  private source: HTMLCanvasElement | undefined;
+  private revision = 0;
   private cards: HTMLButtonElement[];
 
   constructor(
@@ -51,6 +52,28 @@ export class StylePicker {
     });
   }
 
+  setSource(source: HTMLCanvasElement) {
+    if (this.disposed || source === this.source) return;
+    this.source = source;
+    ++this.revision;
+    const ratio = Math.min(96 / source.width, 72 / source.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(source.width * ratio));
+    canvas.height = Math.max(1, Math.round(source.height * ratio));
+    const context = canvas.getContext('2d')!;
+    context.drawImage(source, 0, 0, canvas.width, canvas.height);
+    this.image = context.getImageData(0, 0, canvas.width, canvas.height);
+    for (const card of this.cards) {
+      delete card.dataset.preview;
+      card.querySelector('.style-preview-error')?.remove();
+      const preview = card.querySelector('canvas')!;
+      preview.width = canvas.width;
+      preview.height = canvas.height;
+    }
+    this.processor.dispose();
+    void this.pump();
+  }
+
   sync(selected: AlgorithmId, query: string) {
     let count = 0;
     for (const card of this.cards) {
@@ -66,7 +89,7 @@ export class StylePicker {
   }
 
   private async pump() {
-    if (this.running || this.disposed) return;
+    if (this.running || this.disposed || !this.image) return;
     this.running = true;
     try {
       for (;;) {
@@ -74,27 +97,25 @@ export class StylePicker {
         if (!card || this.disposed) break;
         // A single tiny job at a time; expensive searches also get a hard deadline.
         card.dataset.preview = 'pending';
+        const revision = this.revision;
         const abort = new AbortController();
         const deadline = setTimeout(() => abort.abort(), 1500);
         try {
-          if (!this.sample) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 96;
-            canvas.height = 72;
-            const context = canvas.getContext('2d')!;
-            context.drawImage(makeSample(), 0, 0, 96, 72);
-            this.sample = context.getImageData(0, 0, 96, 72);
-          }
           const settings = cloneSettings(defaults);
           settings.algorithm = card.dataset.algorithm as AlgorithmId;
           settings.scale = 1;
           settings.dbsPasses = 1;
           const result = await this.processor.process(
-            { width: 96, height: 72, data: new Uint8ClampedArray(this.sample.data) },
+            {
+              width: this.image.width,
+              height: this.image.height,
+              data: new Uint8ClampedArray(this.image.data),
+            },
             settings,
             'preview',
             abort.signal,
           );
+          if (this.disposed || revision !== this.revision) continue;
           card
             .querySelector('canvas')!
             .getContext('2d')!
@@ -105,6 +126,7 @@ export class StylePicker {
             );
           card.dataset.preview = 'ready';
         } catch {
+          if (this.disposed || revision !== this.revision) continue;
           // Keep the style usable even when a browser cannot render its preview.
           card.dataset.preview = 'unavailable';
           const fallback = document.createElement('small');
@@ -125,5 +147,7 @@ export class StylePicker {
     this.observer.disconnect();
     this.processor.dispose();
     this.visible.clear();
+    this.image = undefined;
+    this.source = undefined;
   }
 }

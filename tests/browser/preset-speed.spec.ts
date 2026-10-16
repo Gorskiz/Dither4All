@@ -95,7 +95,6 @@ test('speed retimes built-in/custom thumbnails before applying, composes with st
   await speed.focus();
   await speed.press('ArrowRight');
   await expect(speed).toHaveValue('105');
-  await page.getByLabel('Use current image for preset previews', { exact: true }).check();
   await custom.scrollIntoViewIfNeeded();
   await expect(custom).toHaveAttribute('data-preview', 'ready', { timeout: 15000 });
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);

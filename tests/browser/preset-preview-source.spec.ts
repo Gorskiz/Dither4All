@@ -31,7 +31,7 @@ async function saveProject(page: Page) {
   await page.getByRole('button', { name: 'Save project', exact: true }).click();
   return JSON.parse((await readFile((await (await download).path())!)).toString());
 }
-test('sample/current source toggle refreshes built-in and custom previews with the image recipe, preserving project settings', async ({
+test('uploaded images automatically refresh built-in and custom previews with the image recipe, preserving project settings', async ({
   page,
 }) => {
   test.setTimeout(60_000);
@@ -42,18 +42,12 @@ test('sample/current source toggle refreshes built-in and custom previews with t
   await page.getByLabel('Contrast', { exact: true }).fill('0');
   await page.getByLabel('Contrast', { exact: true }).press('Tab');
   const first = page.locator('[data-motion-preset="liquid-ink"]');
-  const source = page.getByLabel('Use current image for preset previews', { exact: true });
+  await expect(page.locator('#motion-preview-current')).toHaveCount(0);
   await first.scrollIntoViewIfNeeded();
   await expect(first).toHaveAttribute('data-preview', 'poster');
-  const image = () => first.locator('canvas').evaluate((c) => (c as HTMLCanvasElement).toDataURL());
-  const sample = await image();
   const project = await saveProject(page);
-  await source.check();
-  await first.scrollIntoViewIfNeeded();
   await expect(first.locator('canvas')).toHaveAttribute('width', '36');
   await expect(first.locator('canvas')).toHaveAttribute('height', '72');
-  await expect(first).toHaveAttribute('data-preview', 'poster');
-  await expect.poll(image).not.toBe(sample);
   const pixel = () =>
     first
       .locator('canvas')
@@ -65,15 +59,6 @@ test('sample/current source toggle refreshes built-in and custom previews with t
   await page.getByLabel('Invert source colors', { exact: true }).check();
   await first.scrollIntoViewIfNeeded();
   await expect(first).toHaveAttribute('data-preview', 'poster');
-  await expect.poll(pixel).toEqual([0, 255, 255, 255]);
-  await source.uncheck();
-  await first.scrollIntoViewIfNeeded();
-  await expect(first).toHaveAttribute('data-preview', 'poster');
-  await expect.poll(image).toBe(sample);
-  await source.check();
-  await source.uncheck();
-  await source.check();
-  await first.scrollIntoViewIfNeeded();
   await expect.poll(pixel).toEqual([0, 255, 255, 255]);
   await page.getByRole('button', { name: 'Save animation preset', exact: true }).click();
   await page.getByLabel('Animation preset name', { exact: true }).fill('Custom');
@@ -88,7 +73,7 @@ test('sample/current source toggle refreshes built-in and custom previews with t
   await expect(page.locator('#motion-saved-preview-note')).toContainText('Current image preview');
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.setViewportSize({ width: 320, height: 844 });
-  await source.scrollIntoViewIfNeeded();
+  await first.scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'test-results/current-image-presets-mobile.png', fullPage: true });
   expect(
     await page.locator('#motion-section').evaluate((e) => e.scrollWidth <= e.clientWidth),

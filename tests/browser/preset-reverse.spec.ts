@@ -94,7 +94,6 @@ test('reverse previews the original direction with speed/strength, applies once,
     .locator('#project-input')
     .setInputFiles({ name: 'reverse.d4a', mimeType: 'application/json', buffer: reversed });
   await expect(applied).toBeChecked();
-  await page.getByLabel('Use current image for preset previews', { exact: true }).check();
   const current = await sample(custom, 8);
   await reverse.check();
   expect(await sample(custom, 24)).toBe(current); // Same direction mapping with the current-image recipe.

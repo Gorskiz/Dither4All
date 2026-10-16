@@ -1265,11 +1265,12 @@ dialog > a {
   cursor: pointer;
 }
 .style-card canvas {
+  object-fit: contain;
   width: 100%;
   height: auto;
   aspect-ratio: 4 / 3;
   image-rendering: pixelated;
-  background: linear-gradient(135deg, #667163, #d2d5c6);
+  background: var(--canvas);
 }
 .style-card span {
   font-size: 10px;

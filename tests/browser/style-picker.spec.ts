@@ -73,3 +73,80 @@ test('style contact sheet renders every method, filters, applies and caches prev
   await expect(gallery.locator('button:visible').first()).toHaveAttribute('data-preview', 'ready');
   expect(errors).toEqual([]);
 });
+
+test('style thumbnails follow uploads automatically, preserve proportions, and invalidate cached images', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const gallery = page.getByRole('group', { name: 'Style previews', exact: true });
+  const card = gallery.locator('button').first();
+  const image = () => card.locator('canvas').evaluate((c) => (c as HTMLCanvasElement).toDataURL());
+  await card.scrollIntoViewIfNeeded();
+  await expect(card).toHaveAttribute('data-preview', 'ready');
+  const sample = await image();
+  const upload = async (color: string, width: number, height: number) => {
+    const data = await page.evaluate(
+      ({ color, width, height }) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext('2d')!;
+        context.fillStyle = color;
+        context.fillRect(0, 0, width, height);
+        return canvas.toDataURL().split(',')[1];
+      },
+      { color, width, height },
+    );
+    await page
+      .locator('#image-input')
+      .setInputFiles({
+        name: 'upload.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from(data, 'base64'),
+      });
+  };
+  await upload('#000000', 80, 160);
+  await card.scrollIntoViewIfNeeded();
+  await expect(card.locator('canvas')).toHaveAttribute('width', '36');
+  await expect(card.locator('canvas')).toHaveAttribute('height', '72');
+  await expect(card).toHaveAttribute('data-preview', 'ready');
+  await expect.poll(image).not.toBe(sample);
+  const black = await image();
+  const pixel = () =>
+    card.locator('canvas').evaluate((c) => {
+      const canvas = c as HTMLCanvasElement;
+      return Array.from(
+        canvas
+          .getContext('2d')!
+          .getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data,
+      );
+    });
+  const blackPixel = await pixel();
+  await upload('#ffffff', 160, 80);
+  await card.scrollIntoViewIfNeeded();
+  await expect(card.locator('canvas')).toHaveAttribute('width', '96');
+  await expect(card.locator('canvas')).toHaveAttribute('height', '48');
+  await expect(card).toHaveAttribute('data-preview', 'ready');
+  await expect.poll(pixel).not.toEqual(blackPixel);
+  await upload('#000000', 80, 160);
+  await card.scrollIntoViewIfNeeded();
+  await expect(card).toHaveAttribute('data-preview', 'ready');
+  await expect.poll(image).toBe(black);
+  // Projects replace the source too, and must update both galleries without a manual switch.
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  const { readFile } = await import('node:fs/promises');
+  const project = await readFile((await (await download).path())!);
+  await upload('#ffffff', 160, 80);
+  await page
+    .locator('#project-input')
+    .setInputFiles({ name: 'upload.d4a', mimeType: 'application/json', buffer: project });
+  await card.scrollIntoViewIfNeeded();
+  await expect(card.locator('canvas')).toHaveAttribute('width', '36');
+  await expect(card).toHaveAttribute('data-preview', 'ready');
+  await expect.poll(image).toBe(black);
+  await page.setViewportSize({ width: 320, height: 844 });
+  await card.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/uploaded-style-thumbnails-mobile.png' });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

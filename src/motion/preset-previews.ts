@@ -1,6 +1,5 @@
-import { cloneSettings, defaults, type Settings } from '../engine/catalog';
+import { cloneSettings, type Settings } from '../engine/catalog';
 import { canvasPixels } from '../files';
-import { makeSample } from '../sample';
 import { drawMotion } from './media';
 import { animateNoise, motionAt, settingsAt, timelineDefaults } from './model';
 import {
@@ -39,7 +38,6 @@ export class MotionPresetPreviews {
   private disposed = false;
   private running = false;
   private timer: ReturnType<typeof setInterval> | undefined;
-  private sample: HTMLCanvasElement | undefined;
   private currentSource: HTMLCanvasElement | null = null;
   private currentImage: HTMLCanvasElement | undefined;
   private currentSettings: Settings | undefined;
@@ -143,32 +141,26 @@ export class MotionPresetPreviews {
     this.update();
   }
   /** Source/recipe changes invalidate every cache, without retaining full-size image copies. */
-  setInput(source: HTMLCanvasElement | null, settings?: Settings, referenceSide = 720) {
+  setInput(source: HTMLCanvasElement, settings: Settings, referenceSide = 720) {
     if (this.disposed) return;
-    const signature = source ? JSON.stringify({ settings, referenceSide }) : '';
+    const signature = JSON.stringify({ settings, referenceSide });
     if (source === this.currentSource && signature === this.inputSignature) return;
     this.currentSource = source;
     this.inputSignature = signature;
-    this.currentImage = undefined;
-    this.currentSettings = undefined;
-    this.width = WIDTH;
-    this.height = HEIGHT;
-    if (source) {
-      const ratio = Math.min(WIDTH / source.width, HEIGHT / source.height);
-      this.width = Math.max(1, Math.round(source.width * ratio));
-      this.height = Math.max(1, Math.round(source.height * ratio));
-      const image = document.createElement('canvas');
-      image.width = this.width;
-      image.height = this.height;
-      image.getContext('2d')!.drawImage(source, 0, 0, this.width, this.height);
-      this.currentImage = image;
-      this.currentSettings = cloneSettings(settings ?? defaults);
-      const outputSide = Math.min(Math.max(source.width, source.height), referenceSide);
-      this.currentSettings.scale = Math.max(
-        1,
-        Math.round((this.currentSettings.scale * Math.max(this.width, this.height)) / outputSide),
-      );
-    }
+    const ratio = Math.min(WIDTH / source.width, HEIGHT / source.height);
+    this.width = Math.max(1, Math.round(source.width * ratio));
+    this.height = Math.max(1, Math.round(source.height * ratio));
+    const image = document.createElement('canvas');
+    image.width = this.width;
+    image.height = this.height;
+    image.getContext('2d')!.drawImage(source, 0, 0, this.width, this.height);
+    this.currentImage = image;
+    this.currentSettings = cloneSettings(settings);
+    const outputSide = Math.min(Math.max(source.width, source.height), referenceSide);
+    this.currentSettings.scale = Math.max(
+      1,
+      Math.round((this.currentSettings.scale * Math.max(this.width, this.height)) / outputSide),
+    );
     this.invalidateFrames();
   }
   setStrength(value: number) {
@@ -206,7 +198,13 @@ export class MotionPresetPreviews {
     this.update();
   }
   private canRender() {
-    return !this.disposed && !this.suspended && !document.hidden && this.visible.size > 0;
+    return (
+      !!this.currentImage &&
+      !this.disposed &&
+      !this.suspended &&
+      !document.hidden &&
+      this.visible.size > 0
+    );
   }
   private jobs() {
     return this.previews.filter(
@@ -267,7 +265,6 @@ export class MotionPresetPreviews {
         const abort = new AbortController();
         const deadline = setTimeout(() => abort.abort(), 1500);
         try {
-          if (!this.currentImage) this.sample ??= makeSample();
           const t = applyMotionAppearance(
             timelineDefaults(4),
             p.appearance,
@@ -277,19 +274,9 @@ export class MotionPresetPreviews {
           );
           t.fps = PREVIEW_FPS;
           const time = index / PREVIEW_FPS;
-          const settings = cloneSettings(this.currentSettings ?? defaults);
-          if (!this.currentSettings) {
-            settings.scale = 1;
-            settings.palette = ['#162c46', '#467b87', '#b2cba4', '#f1e6c2'];
-          }
+          const settings = cloneSettings(this.currentSettings!);
           const s = settingsAt(settings, t, time);
-          const raw = drawMotion(
-            this.currentImage ?? this.sample!,
-            this.width,
-            this.height,
-            t,
-            time,
-          );
+          const raw = drawMotion(this.currentImage!, this.width, this.height, t, time);
           const result = await this.processor.process(
             animateNoise(canvasPixels(raw), t, time, s.seed),
             s,
@@ -346,7 +333,6 @@ export class MotionPresetPreviews {
     this.previews.forEach((p) => {
       p.frames.length = 0;
     });
-    this.sample = undefined;
     this.currentSource = null;
     this.currentImage = undefined;
     this.currentSettings = undefined;

@@ -86,7 +86,14 @@ test('reduced-motion users get static posters and can opt into animation', async
   expect(await image()).toBe(still);
   await page.getByRole('button', { name: 'Play previews', exact: true }).click();
   await expect.poll(image).not.toBe(still);
+  // Wait for the preference event before changing it again; Chrome can coalesce rapid toggles.
+  await page.evaluate(() => {
+    matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (event) => {
+      document.documentElement.dataset.motionPreference = String(event.matches);
+    });
+  });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await expect(page.locator('html')).toHaveAttribute('data-motion-preference', 'false');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(page.getByRole('button', { name: 'Play previews', exact: true })).toBeVisible();
 });

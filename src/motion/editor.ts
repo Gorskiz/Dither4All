@@ -84,7 +84,6 @@ export class MotionEditor {
   private name = 'animation';
   private openVersion = 0;
   private lookPreviews: MotionPresetPreviews;
-  private previewCurrentImage = false;
   private presetStrength = 100;
   private presetSpeed = 1;
   private presetReverse = false;
@@ -111,8 +110,7 @@ export class MotionEditor {
         <div class="motion-trim"><label>In (s)<input id="motion-in" type="number" min="0" step="0.01" value="0"></label><label>Out (s)<input id="motion-out" type="number" min="0.01" step="0.01" value="4"></label><label>FPS<select id="motion-fps" aria-label="FPS"><option>6</option><option selected>12</option><option>24</option><option>30</option></select></label></div>
         <p class="hint">Export a selection up to 30 seconds. Preview adapts to your device.</p>
         <div class="section-title motion-subheading"><h3>Animation looks</h3><button id="motion-preview-toggle" class="small-link" type="button">Pause previews</button></div>
-        <label class="toggle-row motion-preview-source"><input id="motion-preview-current" type="checkbox"> Use current image for preset previews</label>
-        <p class="hint" id="motion-preview-source-note">Uses the sample image and a fixed palette for all preset previews.</p>
+        <p class="hint" id="motion-preview-source-note">Uses your current image and image settings for all preset previews.</p>
         <div class="field-row motion-preset-strength"><label for="motion-preset-strength">Preset strength</label><output id="motion-preset-strength-value" for="motion-preset-strength">100%</output><button id="motion-preset-strength-reset" class="small-link" type="button" aria-label="Reset preset strength">Reset</button></div>
         <input id="motion-preset-strength" class="motion-strength-slider" type="range" min="0" max="200" step="1" value="100" aria-valuetext="100%" aria-describedby="motion-preset-strength-help">
         <p class="hint" id="motion-preset-strength-help">0% removes motion · 100% original · 200% boosted. Updates all preset previews; apply a look to change the stack. Effect amounts cap at 100.</p>
@@ -126,7 +124,7 @@ export class MotionEditor {
         <div class="section-title motion-subheading"><h3>Your animation presets</h3><button id="motion-preset-save" class="small-link" aria-label="Save animation preset">Save</button></div>
         <p class="hint">Save source motion and the current stack. Stored in this browser only, up to 50 presets.</p>
         <label class="sr-only" for="motion-saved-presets">Your saved animation presets</label><select id="motion-saved-presets"><option value="">Choose a preset…</option></select>
-        <div id="motion-saved-preview-region" hidden><div class="section-title motion-saved-preview-heading"><h4>Selected preset preview</h4><button id="motion-saved-preview-toggle" class="small-link" type="button">Pause all previews</button></div><figure id="motion-saved-preview" class="motion-custom-preview"><figcaption><strong id="motion-saved-preview-name"></strong><span id="motion-saved-preview-note">Sample only. Choose Apply preset to use this look.</span></figcaption></figure></div>
+        <div id="motion-saved-preview-region" hidden><div class="section-title motion-saved-preview-heading"><h4>Selected preset preview</h4><button id="motion-saved-preview-toggle" class="small-link" type="button">Pause all previews</button></div><figure id="motion-saved-preview" class="motion-custom-preview"><figcaption><strong id="motion-saved-preview-name"></strong><span id="motion-saved-preview-note">Current image preview. Choose Apply preset to use this look.</span></figcaption></figure></div>
         <div class="two-buttons motion-preset-actions"><button id="motion-preset-apply">Apply preset</button><button id="motion-preset-rename">Rename preset</button><button id="motion-preset-delete">Delete preset</button></div>
         <div class="two-buttons motion-preset-actions"><button id="motion-preset-import">Import presets</button><button id="motion-preset-export">Export selected</button><button id="motion-preset-export-all">Export all</button></div>
         <input id="motion-preset-file" type="file" accept=".json,application/json" hidden aria-label="Import animation preset file">
@@ -184,10 +182,6 @@ export class MotionEditor {
       (el(id).onclick = () => {
         Promise.resolve().then(fn).catch(host.error);
       });
-    el<HTMLInputElement>('motion-preview-current').onchange = () => {
-      this.previewCurrentImage = el<HTMLInputElement>('motion-preview-current').checked;
-      this.syncPreviewSource();
-    };
     const setPresetStrength = (value: number) => {
       if (this.busy) return;
       this.presetStrength = value;
@@ -647,19 +641,13 @@ export class MotionEditor {
       el<HTMLSelectElement>('motion-format').value === 'gif'
         ? Math.min(640, number('motion-size'))
         : number('motion-size');
-    this.lookPreviews.setInput(
-      this.previewCurrentImage ? this.host.source() : null,
-      this.host.settings(),
-      size,
-    );
-    el('motion-preview-source-note').textContent = this.previewCurrentImage
-      ? this.video || this.pendingVideo
+    this.lookPreviews.setInput(this.host.source(), this.host.settings(), size);
+    el('motion-preview-source-note').textContent =
+      this.video || this.pendingVideo
         ? 'Uses the video poster and current image settings. Does not follow video playback.'
-        : 'Uses your current image and image settings for all preset previews.'
-      : 'Uses the sample image and a fixed palette for all preset previews.';
-    el('motion-saved-preview-note').textContent = this.previewCurrentImage
-      ? 'Current image preview. Choose Apply preset to use this look.'
-      : 'Sample only. Choose Apply preset to use this look.';
+        : 'Uses your current image and image settings for all preset previews.';
+    el('motion-saved-preview-note').textContent =
+      'Current image preview. Choose Apply preset to use this look.';
   }
   private needsPalette(preset: SavedMotionPreset) {
     return preset.appearance.effects.some((e) => e.type === 'palette' && e.enabled && e.amount > 0);

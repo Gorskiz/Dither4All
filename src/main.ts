@@ -101,10 +101,10 @@ $('app').innerHTML = `
                       .join('')}</optgroup>`,
                 )
                 .join('')}</select></div>
-              <div class="style-browser-heading"><span>Sample previews</span><span id="style-results">${algorithms.length} styles</span></div>
+              <div class="style-browser-heading"><span>Image previews</span><span id="style-results">${algorithms.length} styles</span></div>
               <div id="style-gallery" class="style-gallery" role="group" aria-label="Style previews" tabindex="0"></div>
               <p id="style-empty" class="hint" hidden>No styles match. Try a different name.</p>
-              <p class="style-preview-note">Shared sample, fixed settings. Select a style to apply it to your media.</p>
+              <p class="style-preview-note">Your current image, fixed comparison settings. Select a style to apply it to your media.</p>
               <div class="field-row"><label for="builtin-preset">Preset</label><select id="builtin-preset"><option value="custom">Custom settings</option><option value="0">The original</option><option value="1">Pocket nostalgia</option><option value="2">After hours</option><option value="3">Print club</option><option value="4">Signal lost</option></select><button id="shuffle" class="icon-button" aria-label="Randomize style" title="Randomize style">${icon('shuffle')}</button></div>
               <p id="algorithm-description" class="hint"></p><p id="method-budget" class="hint budget-hint" hidden></p><div id="dbs-controls" class="control-section" hidden>${slider('dbsPasses', 'DBS passes', 1, 8)}</div><div id="grid-controls" class="control-section" hidden>${slider('gridWidth', 'Grid width', 1, 32)}${slider('gridHeight', 'Grid height', 1, 32)}${slider('gridMinimum', 'Minimum ink', 0, 4096)}</div>
               <div class="control-section">${slider('scale', 'Pixel scale', 1, 16, 1, '×')}${slider('strength', 'Dither strength', 0, 150, 1, '%')}${slider('patternSize', 'Pattern size', 2, 32, 1, 'px')}${slider('threshold', 'Threshold', 0, 100, 1, '%')}${slider('jitter', 'Jitter', 0, 100, 1, '%')}<div id="matrix-step-controls" class="control-subsection" hidden>${slider('matrixStep', 'Matrix step', 1, 128)}</div><div id="history-controls" class="control-subsection" hidden>${slider('errorHistory', 'Error history', 4, 64)}</div></div><label id="serpentine-row" class="toggle-row"><input id="serpentine" type="checkbox"> Serpentine scan</label><div id="matrix-rotation-row" class="field-row" hidden><label for="matrix-rotation">Rotate</label><select id="matrix-rotation"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
@@ -463,6 +463,7 @@ async function runWorker(
   }
 }
 function scheduleRender() {
+  stylePicker.setSource(source);
   if (motion.active) {
     clearTimeout(renderTimer);
     ++renderVersion;
@@ -717,6 +718,7 @@ const motion = new MotionEditor({
   source: () => source,
   setSource: (canvas, name) => {
     source = canvas;
+    stylePicker.setSource(source);
     sourceName = name;
     $('image-name').textContent = name;
   },
@@ -776,6 +778,7 @@ function selectAlgorithm(id: AlgorithmId) {
   });
 }
 const stylePicker = new StylePicker($('style-gallery'), selectAlgorithm);
+stylePicker.setSource(source);
 $<HTMLSelectElement>('algorithm-select').onchange = () =>
   selectAlgorithm($<HTMLSelectElement>('algorithm-select').value as AlgorithmId);
 $<HTMLSelectElement>('builtin-preset').onchange = () => {

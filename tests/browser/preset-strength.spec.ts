@@ -111,7 +111,6 @@ test('strength previews built-in and saved looks without changing the project or
   await expect(page.getByLabel('Twist 1 Amount', { exact: true })).toHaveValue('10');
   await page.getByLabel('FPS', { exact: true }).selectOption('24');
   expect((await project(page)).motion.timeline.amount).toBe(7.5);
-  await page.getByLabel('Use current image for preset previews', { exact: true }).check();
   await custom.scrollIntoViewIfNeeded();
   await expect(custom).toHaveAttribute('data-preview', 'poster');
   const currentQuarter = await customImage();
