@@ -123,7 +123,7 @@ export class MotionEditor {
         <p class="hint" id="motion-preset-phase-help">Shift where every motion cycle starts. 360° returns to the original start. Preview first, then apply; layer offsets stay intact.</p>
         <label class="toggle-row motion-preview-source"><input id="motion-preset-reverse" type="checkbox" aria-describedby="motion-preset-reverse-help"> Reverse preset direction</label>
         <p class="hint" id="motion-preset-reverse-help">Flip the original look in all preset previews, then apply. Video, audio and keyframes keep playing forward.</p>
-        <div class="two-buttons motion-preset-actions"><button id="motion-preset-reset-all" class="outline-button" type="button">Reset all preset controls</button></div>
+        <div class="two-buttons motion-preset-actions"><button id="motion-preset-randomize" class="outline-button" type="button">Randomize preset controls</button><button id="motion-preset-reset-all" class="outline-button" type="button">Reset all preset controls</button></div>
         <p class="hint" id="motion-preset-controls-status" role="status"></p>
         <p class="hint" id="motion-looks-help">Previews show each look without applying it. One click replaces source motion and the stack. Your image settings, trim and keyframes stay as they are.</p>
         <div class="motion-looks" role="group" aria-label="Animation looks" aria-describedby="motion-looks-help">${motionPresets.map((p) => `<button type="button" class="motion-look" data-motion-preset="${p.id}" aria-pressed="false"><strong>${p.name}</strong><span>${p.description}</span></button>`).join('')}</div>
@@ -235,6 +235,24 @@ export class MotionEditor {
       setPresetControls({ strength: 100, speed: 1, phase: 0, reverse: false });
       el('motion-preset-controls-status').textContent =
         'Preset controls reset: 100% strength, 1× speed, 0° phase, original direction. Apply a look to use it.';
+    });
+    bind('motion-preset-randomize', () => {
+      if (this.busy) return;
+      const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
+      const strength = 25 + Math.floor(Math.random() * 36) * 5;
+      const speed = speeds[Math.floor(Math.random() * speeds.length)];
+      let phase = Math.floor(Math.random() * 24) * 15;
+      const reverse = Math.random() < 0.5;
+      if (
+        strength === this.presetStrength &&
+        speed === this.presetSpeed &&
+        phase === this.presetPhase % 360 &&
+        reverse === this.presetReverse
+      )
+        phase = (phase + 15) % 360;
+      setPresetControls({ strength, speed, phase, reverse });
+      el('motion-preset-controls-status').textContent =
+        `Randomized: ${strength}% strength, ${speed}× speed, ${phase}° phase, ${reverse ? 'flipped' : 'original'} direction. Apply a look to use it.`;
     });
     el<HTMLInputElement>('motion-reverse').onchange = () => {
       if (this.busy) return;
