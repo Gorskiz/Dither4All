@@ -40,6 +40,7 @@ import {
   type SavedMotionPreset,
 } from './saved-presets';
 import { MotionPresetPreviews } from './preset-previews';
+import { loadPresetLocks, savePresetLocks, presetLockDefaults } from './lock-preferences';
 import type { CanvasSink } from 'mediabunny';
 
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -88,7 +89,7 @@ export class MotionEditor {
   private presetSpeed = 1;
   private presetReverse = false;
   private presetPhase = 0;
-  private presetLocks = { strength: false, speed: false, phase: false, direction: false };
+  private presetLocks = presetLockDefaults();
   private importingPresets = false;
   private savedMotionPresets: SavedMotionPreset[] = [];
   private presetEdit: { kind: 'save' } | { kind: 'rename'; id: string } | null = null;
@@ -125,6 +126,7 @@ export class MotionEditor {
         <div class="motion-preset-direction"><label class="toggle-row motion-preview-source"><input id="motion-preset-reverse" type="checkbox" aria-describedby="motion-preset-reverse-help"> Reverse preset direction</label><button id="motion-preset-lock-direction" class="small-link motion-preset-lock" type="button" aria-label="Lock preset direction" aria-pressed="false">Lock</button></div>
         <p class="hint" id="motion-preset-reverse-help">Flip the original look in all preset previews, then apply. Video, audio and keyframes keep playing forward.</p>
         <p class="hint">Locks affect Randomize only. You can still edit or reset locked controls.</p>
+        <p id="motion-preset-lock-note" class="hint" role="status" hidden></p>
         <div class="two-buttons motion-preset-actions"><button id="motion-preset-lock-all" class="small-link" type="button" aria-label="Lock all preset controls">Lock all</button><button id="motion-preset-unlock-all" class="small-link" type="button" aria-label="Unlock all preset controls">Unlock all</button></div>
         <div class="two-buttons motion-preset-actions"><button id="motion-preset-randomize" class="outline-button" type="button">Randomize preset controls</button><button id="motion-preset-reset-all" class="outline-button" type="button">Reset all preset controls</button></div>
         <p class="hint" id="motion-preset-controls-status" role="status"></p>
@@ -246,11 +248,33 @@ export class MotionEditor {
       button.setAttribute('aria-label', `${locked ? 'Locked' : 'Lock'} preset ${key}`);
       button.textContent = locked ? 'Locked' : 'Lock';
     };
+    const lockPreferenceError = (message: string) => {
+      el('motion-preset-lock-note').textContent = message;
+      el('motion-preset-lock-note').hidden = !message;
+    };
+    try {
+      const locks = loadPresetLocks(localStorage);
+      for (const key of ['strength', 'speed', 'phase', 'direction'] as const)
+        setPresetLock(key, locks[key]);
+    } catch {
+      lockPreferenceError(
+        'Preset lock preferences could not be restored. Controls start unlocked.',
+      );
+    }
+    const persistPresetLocks = () => {
+      try {
+        savePresetLocks(localStorage, this.presetLocks);
+        lockPreferenceError('');
+      } catch {
+        lockPreferenceError('Locks work for this session, but could not be saved in this browser.');
+      }
+    };
     for (const locked of [true, false]) {
       bind(`motion-preset-${locked ? 'lock' : 'unlock'}-all`, () => {
         if (this.busy) return;
         for (const key of ['strength', 'speed', 'phase', 'direction'] as const)
           setPresetLock(key, locked);
+        persistPresetLocks();
         el('motion-preset-controls-status').textContent = locked
           ? 'All preset controls locked. Unlock a control to randomize it.'
           : 'All preset controls unlocked for randomizing.';
@@ -261,6 +285,7 @@ export class MotionEditor {
         if (this.busy) return;
         const locked = !this.presetLocks[key];
         setPresetLock(key, locked);
+        persistPresetLocks();
         el('motion-preset-controls-status').textContent =
           `Preset ${key} ${locked ? 'locked for' : 'unlocked for'} randomizing.`;
       });

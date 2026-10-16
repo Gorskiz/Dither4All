@@ -27,6 +27,7 @@ Batch snapshots the settings at its start, decodes one image at a time, and coll
 ## Persistence and privacy
 
 - `localStorage['dither4all-presets']`: up to 50 named settings objects, validated on read.
+- `localStorage['dither4all-motion-preset-locks']`: four validated boolean lock preferences (strength, speed, phase, direction), restored independently of media, projects and preset libraries. Missing preferences default to unlocked. Invalid/unreadable values leave storage intact and show a notice; failed writes preserve working session state. Bulk lock operations write once, and successful writes clear the notice.
 - `localStorage['dither4all-motion-presets']`: up to 50 named animation appearances with stable IDs, validated source motion and ordered effects. No media, image recipe or timeline keys. Reads reject malformed libraries; writes report unavailable/full storage. Rename/delete operate on IDs and refresh against storage before writing. Storage events refresh other tabs.
 - URL `#recipe=`: settings JSON only. No image bytes.
 - `.d4a`: versioned JSON with settings, a source name, and an embedded PNG image.
