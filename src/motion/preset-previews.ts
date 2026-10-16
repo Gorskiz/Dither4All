@@ -164,24 +164,31 @@ export class MotionPresetPreviews {
     );
     this.invalidateFrames();
   }
-  setStrength(value: number) {
-    if (this.disposed || this.strength === value) return;
-    this.strength = value;
-    this.invalidateFrames();
-  }
-  setSpeed(value: number) {
-    if (this.disposed || this.speed === value) return;
-    this.speed = value;
-    this.invalidateFrames();
-  }
-  setReverse(value: boolean) {
-    if (this.disposed || this.reverse === value) return;
-    this.reverse = value;
-    this.invalidateFrames();
-  }
-  setPhase(value: number) {
-    if (this.disposed || this.phase === value % 360) return;
-    this.phase = value % 360;
+  /** Update related controls together so Reset all invalidates cached frames only once. */
+  setControls({
+    strength,
+    speed,
+    phase,
+    reverse,
+  }: {
+    strength: number;
+    speed: number;
+    phase: number;
+    reverse: boolean;
+  }) {
+    phase %= 360;
+    if (
+      this.disposed ||
+      (this.strength === strength &&
+        this.speed === speed &&
+        this.phase === phase &&
+        this.reverse === reverse)
+    )
+      return;
+    this.strength = strength;
+    this.speed = speed;
+    this.phase = phase;
+    this.reverse = reverse;
     this.invalidateFrames();
   }
   private invalidateFrames() {

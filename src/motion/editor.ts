@@ -123,6 +123,8 @@ export class MotionEditor {
         <p class="hint" id="motion-preset-phase-help">Shift where every motion cycle starts. 360° returns to the original start. Preview first, then apply; layer offsets stay intact.</p>
         <label class="toggle-row motion-preview-source"><input id="motion-preset-reverse" type="checkbox" aria-describedby="motion-preset-reverse-help"> Reverse preset direction</label>
         <p class="hint" id="motion-preset-reverse-help">Flip the original look in all preset previews, then apply. Video, audio and keyframes keep playing forward.</p>
+        <div class="two-buttons motion-preset-actions"><button id="motion-preset-reset-all" class="outline-button" type="button">Reset all preset controls</button></div>
+        <p class="hint" id="motion-preset-controls-status" role="status"></p>
         <p class="hint" id="motion-looks-help">Previews show each look without applying it. One click replaces source motion and the stack. Your image settings, trim and keyframes stay as they are.</p>
         <div class="motion-looks" role="group" aria-label="Animation looks" aria-describedby="motion-looks-help">${motionPresets.map((p) => `<button type="button" class="motion-look" data-motion-preset="${p.id}" aria-pressed="false"><strong>${p.name}</strong><span>${p.description}</span></button>`).join('')}</div>
         <div class="section-title motion-subheading"><h3>Your animation presets</h3><button id="motion-preset-save" class="small-link" aria-label="Save animation preset">Save</button></div>
@@ -187,48 +189,53 @@ export class MotionEditor {
       (el(id).onclick = () => {
         Promise.resolve().then(fn).catch(host.error);
       });
-    const setPresetStrength = (value: number) => {
+    const setPresetControls = ({
+      strength = this.presetStrength,
+      speed = this.presetSpeed,
+      phase = this.presetPhase,
+      reverse = this.presetReverse,
+    }: {
+      strength?: number;
+      speed?: number;
+      phase?: number;
+      reverse?: boolean;
+    }) => {
       if (this.busy) return;
-      this.presetStrength = value;
-      el<HTMLInputElement>('motion-preset-strength').value = String(value);
-      el('motion-preset-strength').setAttribute('aria-valuetext', `${value}%`);
-      el('motion-preset-strength-value').textContent = `${value}%`;
-      this.lookPreviews.setStrength(value);
+      this.presetStrength = strength;
+      this.presetSpeed = speed;
+      this.presetPhase = phase;
+      this.presetReverse = reverse;
+      el<HTMLInputElement>('motion-preset-strength').value = String(strength);
+      el('motion-preset-strength').setAttribute('aria-valuetext', `${strength}%`);
+      el('motion-preset-strength-value').textContent = `${strength}%`;
+      el<HTMLInputElement>('motion-preset-speed').value = String(speed * 100);
+      el('motion-preset-speed').setAttribute('aria-valuetext', `${speed}×`);
+      el('motion-preset-speed-value').textContent = `${speed}×`;
+      el<HTMLInputElement>('motion-preset-phase').value = String(phase);
+      el('motion-preset-phase').setAttribute('aria-valuetext', `${phase}°`);
+      el('motion-preset-phase-value').textContent = `${phase}°`;
+      el<HTMLInputElement>('motion-preset-reverse').checked = reverse;
+      this.lookPreviews.setControls({ strength, speed, phase, reverse });
+      el('motion-preset-controls-status').textContent = '';
       this.syncPresets();
     };
     el<HTMLInputElement>('motion-preset-strength').oninput = () =>
-      setPresetStrength(number('motion-preset-strength'));
-    bind('motion-preset-strength-reset', () => setPresetStrength(100));
-    const setPresetSpeed = (value: number) => {
-      if (this.busy) return;
-      this.presetSpeed = value;
-      el<HTMLInputElement>('motion-preset-speed').value = String(value * 100);
-      el('motion-preset-speed').setAttribute('aria-valuetext', `${value}×`);
-      el('motion-preset-speed-value').textContent = `${value}×`;
-      this.lookPreviews.setSpeed(value);
-      this.syncPresets();
-    };
+      setPresetControls({ strength: number('motion-preset-strength') });
+    bind('motion-preset-strength-reset', () => setPresetControls({ strength: 100 }));
     el<HTMLInputElement>('motion-preset-speed').oninput = () =>
-      setPresetSpeed(number('motion-preset-speed') / 100);
-    bind('motion-preset-speed-reset', () => setPresetSpeed(1));
-    const setPresetPhase = (value: number) => {
-      if (this.busy) return;
-      this.presetPhase = value;
-      el<HTMLInputElement>('motion-preset-phase').value = String(value);
-      el('motion-preset-phase').setAttribute('aria-valuetext', `${value}°`);
-      el('motion-preset-phase-value').textContent = `${value}°`;
-      this.lookPreviews.setPhase(value);
-      this.syncPresets();
-    };
+      setPresetControls({ speed: number('motion-preset-speed') / 100 });
+    bind('motion-preset-speed-reset', () => setPresetControls({ speed: 1 }));
     el<HTMLInputElement>('motion-preset-phase').oninput = () =>
-      setPresetPhase(number('motion-preset-phase'));
-    bind('motion-preset-phase-reset', () => setPresetPhase(0));
-    el<HTMLInputElement>('motion-preset-reverse').onchange = () => {
+      setPresetControls({ phase: number('motion-preset-phase') });
+    bind('motion-preset-phase-reset', () => setPresetControls({ phase: 0 }));
+    el<HTMLInputElement>('motion-preset-reverse').onchange = () =>
+      setPresetControls({ reverse: el<HTMLInputElement>('motion-preset-reverse').checked });
+    bind('motion-preset-reset-all', () => {
       if (this.busy) return;
-      this.presetReverse = el<HTMLInputElement>('motion-preset-reverse').checked;
-      this.lookPreviews.setReverse(this.presetReverse);
-      this.syncPresets();
-    };
+      setPresetControls({ strength: 100, speed: 1, phase: 0, reverse: false });
+      el('motion-preset-controls-status').textContent =
+        'Preset controls reset: 100% strength, 1× speed, 0° phase, original direction. Apply a look to use it.';
+    });
     el<HTMLInputElement>('motion-reverse').onchange = () => {
       if (this.busy) return;
       this.pause();

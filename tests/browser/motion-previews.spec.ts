@@ -53,6 +53,9 @@ test('animation look cards animate cached samples, pause off-screen, and remain 
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export animation', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause previews', exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Reset all preset controls', exact: true }),
+  ).toBeDisabled();
   const exporting = await image();
   await page.waitForTimeout(400);
   expect(await image()).toBe(exporting);
