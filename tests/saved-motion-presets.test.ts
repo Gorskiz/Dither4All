@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   MOTION_PRESETS_KEY,
+  MAX_MOTION_PRESET_FILE_BYTES,
+  exportMotionPresets,
+  readMotionPresetFile,
+  importMotionPresets,
   loadSavedMotionPresets,
   saveMotionPreset,
   renameMotionPreset,
@@ -113,5 +117,112 @@ describe('saved animation presets', () => {
         'id',
       ),
     ).toThrow('unavailable or full');
+  });
+});
+
+describe('animation preset sharing', () => {
+  it('exports selected or all presets without IDs, keys, media or image settings and imports into a fresh browser library', () => {
+    const source = storage();
+    saveMotionPreset(source, 'Lake', appearance(), 'source-one');
+    saveMotionPreset(source, 'Other', appearance(), 'source-two');
+    const single = JSON.parse(exportMotionPresets(source, 'source-two'));
+    expect(single).toMatchObject({ type: 'dither4all-animation-presets', version: 1 });
+    expect(single.presets).toHaveLength(1);
+    expect(single.presets[0].name).toBe('Other');
+    expect(Object.keys(single.presets[0]).sort()).toEqual(['appearance', 'name']);
+    expect(Object.keys(single.presets[0].appearance).sort()).toEqual([
+      'amount',
+      'cycles',
+      'effect',
+      'effects',
+    ]);
+    const target = storage();
+    let id = 0;
+    const imported = importMotionPresets(target, exportMotionPresets(source), () => `new-${id++}`);
+    expect(imported.added).toBe(2);
+    expect(imported.renamed).toBe(0);
+    expect(imported.presets[0].id).toBe('new-0');
+    expect(exportMotionPresets(target)).toBe(exportMotionPresets(source));
+  });
+  it('numbers case-insensitive duplicate names without overwriting, including duplicates within one file and long names', () => {
+    const store = storage();
+    const name = 'A'.repeat(60);
+    saveMotionPreset(store, name, appearance(), 'original');
+    const json = JSON.parse(exportMotionPresets(store));
+    json.presets.push({ ...json.presets[0], name: name.toLowerCase() });
+    let i = 0;
+    const result = importMotionPresets(store, JSON.stringify(json), () => `import-${i++}`);
+    expect(result.renamed).toBe(2);
+    expect(result.presets.map((p) => p.name)).toEqual([
+      name,
+      'A'.repeat(56) + ' (2)',
+      'a'.repeat(56) + ' (3)',
+    ]);
+    expect(result.presets.every((p) => p.name.length <= 60)).toBe(true);
+    expect(result.presets[0].id).toBe('original');
+  });
+  it('rejects malformed, unrelated, unsupported and oversized files without changing the library', () => {
+    const store = storage();
+    saveMotionPreset(store, 'Keep', appearance(), 'keep');
+    const json = JSON.parse(exportMotionPresets(store));
+    const before = store.getItem(MOTION_PRESETS_KEY);
+    for (const text of [
+      '{',
+      'null',
+      '[]',
+      JSON.stringify({ version: 1, settings: {} }),
+      JSON.stringify({ ...json, version: 2 }),
+      JSON.stringify({ ...json, type: 'other' }),
+      JSON.stringify({ ...json, presets: [] }),
+      JSON.stringify({ ...json, presets: Array(51).fill(json.presets[0]) }),
+      JSON.stringify({ ...json, presets: [json.presets[0], { name: 'Broken', appearance: {} }] }),
+      ' '.repeat(MAX_MOTION_PRESET_FILE_BYTES + 1),
+      '🌊'.repeat(MAX_MOTION_PRESET_FILE_BYTES / 3),
+    ]) {
+      expect(() => importMotionPresets(store, text)).toThrow();
+      expect(store.getItem(MOTION_PRESETS_KEY)).toBe(before);
+    }
+  });
+  it('imports atomically at the capacity boundary and rejects ID collisions or failed writes', () => {
+    const source = storage();
+    saveMotionPreset(source, 'New', appearance(), 'source');
+    const json = exportMotionPresets(source);
+    const target = storage();
+    for (let i = 0; i < 49; i++) saveMotionPreset(target, `Saved ${i}`, appearance(), `id-${i}`);
+    const before = target.getItem(MOTION_PRESETS_KEY);
+    expect(() => importMotionPresets(target, json, () => 'id-0')).toThrow('unique');
+    expect(target.getItem(MOTION_PRESETS_KEY)).toBe(before);
+    expect(importMotionPresets(target, json, () => 'last').presets).toHaveLength(50);
+    const full = target.getItem(MOTION_PRESETS_KEY);
+    expect(() => importMotionPresets(target, json)).toThrow('only 0');
+    expect(target.getItem(MOTION_PRESETS_KEY)).toBe(full);
+    expect(() =>
+      importMotionPresets(
+        {
+          getItem: () => null,
+          setItem: () => {
+            throw new Error();
+          },
+        },
+        json,
+      ),
+    ).toThrow('unavailable or full');
+    expect(() => exportMotionPresets(storage())).toThrow();
+    expect(() => exportMotionPresets(source, 'missing')).toThrow();
+  });
+  it('strips extra fields and preserves disabled effects and parameter values', () => {
+    const source = storage();
+    const t = appearance();
+    t.effects[0].phase = 85;
+    t.effects[1].enabled = false;
+    saveMotionPreset(source, '<b>Lake</b>', t, 'local');
+    const json = JSON.parse(exportMotionPresets(source));
+    json.presets[0].id = 'untrusted';
+    json.presets[0].appearance.keys = [{ time: 0, channel: 'brightness', value: 100 }];
+    const parsed = readMotionPresetFile(JSON.stringify(json));
+    expect(parsed[0]).toEqual({
+      name: '<b>Lake</b>',
+      appearance: loadSavedMotionPresets(source)[0].appearance,
+    });
   });
 });

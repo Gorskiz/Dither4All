@@ -137,3 +137,101 @@ test('saved palette stacks show compatibility and refresh after another tab rena
   await expect(second.getByRole('button', { name: 'Apply preset', exact: true })).toBeDisabled();
   await second.close();
 });
+
+test('exports selected/all presets and imports them into another browser with duplicate handling and no animation changes', async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(60_000);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Animate image', exact: true }).click();
+  await page.getByLabel('Longest side', { exact: true }).selectOption('128');
+  await expect(page.getByRole('button', { name: 'Export all', exact: true })).toBeDisabled();
+  for (const [look, name] of [
+    ['Mirror Lake', 'Lake'],
+    ['Aftershock', 'Shock'],
+  ]) {
+    await page.getByRole('button', { name: new RegExp(`^${look}`) }).click();
+    await page.getByRole('button', { name: 'Save animation preset', exact: true }).click();
+    await page.getByLabel('Animation preset name', { exact: true }).fill(name);
+    await page
+      .locator('#motion-preset-form')
+      .getByRole('button', { name: 'Save', exact: true })
+      .click();
+  }
+  const exportFile = async (name: string) => {
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name, exact: true }).click();
+    return readFile((await (await download).path())!);
+  };
+  const single = await exportFile('Export selected');
+  expect(JSON.parse(single.toString()).presets.map((p: { name: string }) => p.name)).toEqual([
+    'Shock',
+  ]);
+  const all = await exportFile('Export all');
+  expect(JSON.parse(all.toString()).presets).toHaveLength(2);
+  const otherContext = await browser.newContext();
+  try {
+    const other = await otherContext.newPage();
+    await other.goto(page.url());
+    await other.getByRole('button', { name: 'Animate image', exact: true }).click();
+    await other.getByLabel('Longest side', { exact: true }).selectOption('128');
+    const select = other.getByLabel('Your saved animation presets', { exact: true });
+    await expect(select.locator('option')).toHaveCount(1);
+    const file = { name: 'shared.json', mimeType: 'application/json', buffer: all };
+    await other.locator('#motion-preset-file').setInputFiles(file);
+    await expect(other.locator('#motion-preset-status')).toContainText('Imported 2');
+    await expect(other.locator('#motion-stack-count')).toHaveText('0 / 8');
+    await other.locator('#motion-preset-file').setInputFiles(file);
+    await expect(other.locator('#motion-preset-status')).toContainText(
+      '2 duplicate names numbered',
+    );
+    await expect(select.locator('option')).toHaveText([
+      'Choose a preset…',
+      'Lake',
+      'Shock',
+      'Lake (2)',
+      'Shock (2)',
+    ]);
+    await other.getByRole('button', { name: 'Apply preset', exact: true }).click();
+    await expect(other.getByLabel('Flowing displacement 1 Amount', { exact: true })).toHaveValue(
+      '15',
+    );
+    await other
+      .locator('#motion-preset-file')
+      .setInputFiles({
+        name: 'bad.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from('{"version":2}'),
+      });
+    await expect(other.locator('#motion-preset-status')).toContainText(
+      'Invalid animation preset file',
+    );
+    await expect(select.locator('option')).toHaveCount(5);
+    await expect(other.locator('#motion-stack-count')).toHaveText('2 / 8');
+    await other
+      .locator('#motion-preset-file')
+      .setInputFiles({
+        name: 'huge.json',
+        mimeType: 'application/json',
+        buffer: Buffer.alloc(256 * 1024 + 1, 32),
+      });
+    await expect(other.locator('#motion-preset-status')).toContainText('256 KB');
+    await expect(select.locator('option')).toHaveCount(5);
+    expect((await new AxeBuilder({ page: other }).analyze()).violations).toEqual([]);
+    await other.setViewportSize({ width: 320, height: 844 });
+    await select.scrollIntoViewIfNeeded();
+    await other.screenshot({
+      path: 'test-results/shared-motion-presets-mobile.png',
+      fullPage: true,
+    });
+    expect(
+      await other.locator('#motion-section').evaluate((e) => e.scrollWidth <= e.clientWidth),
+    ).toBe(true);
+    await other.reload();
+    await other.getByRole('button', { name: 'Animate image', exact: true }).click();
+    await expect(select.locator('option')).toHaveCount(5);
+  } finally {
+    await otherContext.close();
+  }
+});

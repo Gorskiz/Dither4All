@@ -95,3 +95,88 @@ export function deleteMotionPreset(storage: PresetStorage, id: string): SavedMot
     presets.filter((p) => p.id !== id),
   );
 }
+
+export const MAX_MOTION_PRESET_FILE_BYTES = 256 * 1024;
+const PRESET_FILE_TYPE = 'dither4all-animation-presets';
+interface SharedMotionPreset {
+  name: string;
+  appearance: MotionAppearance;
+}
+/** Sharing excludes browser-local IDs, media, image recipes and timeline keys. */
+export function exportMotionPresets(storage: PresetStorage, selectedId?: string): string {
+  const library = loadSavedMotionPresets(storage);
+  const selected = selectedId === undefined ? library : library.filter((p) => p.id === selectedId);
+  if (!selected.length) throw new Error('Choose a saved animation preset to export.');
+  return JSON.stringify(
+    {
+      type: PRESET_FILE_TYPE,
+      version: 1,
+      presets: selected.map(({ name, appearance }) => ({ name, appearance })),
+    },
+    null,
+    2,
+  );
+}
+export function readMotionPresetFile(text: string): SharedMotionPreset[] {
+  if (
+    text.length > MAX_MOTION_PRESET_FILE_BYTES ||
+    new TextEncoder().encode(text).length > MAX_MOTION_PRESET_FILE_BYTES
+  )
+    throw new Error('Animation preset files must be 256 KB or smaller.');
+  try {
+    const file = JSON.parse(text);
+    if (
+      !file ||
+      file.type !== PRESET_FILE_TYPE ||
+      file.version !== 1 ||
+      !Array.isArray(file.presets) ||
+      file.presets.length < 1 ||
+      file.presets.length > MAX_SAVED_MOTION_PRESETS
+    )
+      throw new Error();
+    return file.presets.map((p: SharedMotionPreset) => ({
+      name: nameOf(p.name),
+      appearance: captureMotionAppearance(p.appearance),
+    }));
+  } catch {
+    throw new Error(
+      'Invalid animation preset file. Use a version 1 animation preset JSON exported from Dither4All.',
+    );
+  }
+}
+/** Validate everything before a single write: failed imports never partially fill a library. */
+export function importMotionPresets(
+  storage: PresetStorage,
+  text: string,
+  createId: () => string = () => crypto.randomUUID(),
+) {
+  const incoming = readMotionPresetFile(text);
+  const library = loadSavedMotionPresets(storage);
+  if (library.length + incoming.length > MAX_SAVED_MOTION_PRESETS)
+    throw new Error(
+      `This import needs ${incoming.length} slots; only ${MAX_SAVED_MOTION_PRESETS - library.length} of 50 are free. Delete presets to make room.`,
+    );
+  const names = new Set(library.map((p) => p.name.toLowerCase()));
+  const ids = new Set(library.map((p) => p.id));
+  let renamed = 0;
+  const added = incoming.map((p) => {
+    let name = p.name;
+    for (let i = 2; names.has(name.toLowerCase()); i++) {
+      const suffix = ` (${i})`;
+      name = p.name.slice(0, 60 - suffix.length).trimEnd() + suffix;
+    }
+    if (name !== p.name) renamed++;
+    names.add(name.toLowerCase());
+    const id = createId();
+    if (typeof id !== 'string' || !id || id.length > 100 || ids.has(id))
+      throw new Error('Could not create a unique animation preset ID. Try importing again.');
+    ids.add(id);
+    return { id, name, appearance: p.appearance };
+  });
+  return {
+    presets: write(storage, [...library, ...added]),
+    added: added.length,
+    renamed,
+    firstId: added[0].id,
+  };
+}

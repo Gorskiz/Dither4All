@@ -29,6 +29,9 @@ import {
 } from './presets';
 import {
   MOTION_PRESETS_KEY,
+  MAX_MOTION_PRESET_FILE_BYTES,
+  exportMotionPresets,
+  importMotionPresets,
   MAX_SAVED_MOTION_PRESETS,
   loadSavedMotionPresets,
   saveMotionPreset,
@@ -79,6 +82,7 @@ export class MotionEditor {
   private pendingVideo: MotionProject['video'];
   private name = 'animation';
   private openVersion = 0;
+  private importingPresets = false;
   private savedMotionPresets: SavedMotionPreset[] = [];
   private presetEdit: { kind: 'save' } | { kind: 'rename'; id: string } | null = null;
   constructor(private host: Host) {
@@ -107,6 +111,9 @@ export class MotionEditor {
         <p class="hint">Save source motion and the current stack. Stored in this browser only, up to 50 presets.</p>
         <label class="sr-only" for="motion-saved-presets">Your saved animation presets</label><select id="motion-saved-presets"><option value="">Choose a preset…</option></select>
         <div class="two-buttons motion-preset-actions"><button id="motion-preset-apply">Apply preset</button><button id="motion-preset-rename">Rename preset</button><button id="motion-preset-delete">Delete preset</button></div>
+        <div class="two-buttons motion-preset-actions"><button id="motion-preset-import">Import presets</button><button id="motion-preset-export">Export selected</button><button id="motion-preset-export-all">Export all</button></div>
+        <input id="motion-preset-file" type="file" accept=".json,application/json" hidden aria-label="Import animation preset file">
+        <p class="hint">Share JSON files with one preset or your whole library. Imports add copies; duplicate names get numbered.</p>
         <p id="motion-preset-compatibility" class="hint" hidden>Switch to Palette color mode to apply this preset.</p>
         <form id="motion-preset-form" class="inline-preset" hidden><label class="field-label" for="motion-preset-name">Animation preset name</label><input id="motion-preset-name" maxlength="60" required><div class="two-buttons"><button type="submit" class="outline-button" id="motion-preset-submit">Save</button><button type="button" id="motion-preset-cancel">Cancel</button></div></form>
         <p id="motion-preset-status" class="hint" role="status"></p>
@@ -312,6 +319,63 @@ export class MotionEditor {
         if (playing) this.play();
       }),
     );
+    bind('motion-preset-export', () =>
+      manage(() => {
+        const preset = selectedPreset();
+        if (!preset) return;
+        const json = exportMotionPresets(localStorage, preset.id);
+        const filename =
+          preset.name.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '') || 'animation-preset';
+        download(
+          new Blob([json], { type: 'application/json' }),
+          `${filename}-animation-preset.json`,
+        );
+        el('motion-preset-status').textContent = `Exported “${preset.name}”.`;
+      }),
+    );
+    bind('motion-preset-export-all', () =>
+      manage(() => {
+        const json = exportMotionPresets(localStorage);
+        download(
+          new Blob([json], { type: 'application/json' }),
+          'dither4all-animation-presets.json',
+        );
+        el('motion-preset-status').textContent = 'Exported animation preset library.';
+      }),
+    );
+    bind('motion-preset-import', () => {
+      if (this.busy || this.importingPresets) return;
+      el<HTMLInputElement>('motion-preset-file').click();
+    });
+    el<HTMLInputElement>('motion-preset-file').onchange = async () => {
+      const input = el<HTMLInputElement>('motion-preset-file');
+      const file = input.files?.[0];
+      input.value = '';
+      if (!file || this.importingPresets) return;
+      this.importingPresets = true;
+      this.syncSavedPresetControls();
+      try {
+        this.assertIdle();
+        if (file.size > MAX_MOTION_PRESET_FILE_BYTES)
+          throw new Error('Animation preset files must be 256 KB or smaller.');
+        const text = await file.text();
+        this.assertIdle();
+        const result = importMotionPresets(localStorage, text);
+        this.savedMotionPresets = result.presets;
+        this.renderSavedPresets(result.firstId);
+        this.presetEdit = null;
+        el('motion-preset-form').hidden = true;
+        el('motion-preset-status').textContent =
+          `Imported ${result.added} animation preset${result.added === 1 ? '' : 's'}.${result.renamed ? ` ${result.renamed} duplicate name${result.renamed === 1 ? '' : 's'} numbered.` : ''} Current animation kept.`;
+        el('motion-saved-presets').focus();
+      } catch (error) {
+        el('motion-preset-status').textContent =
+          error instanceof Error ? error.message : 'Could not import animation presets.';
+      } finally {
+        this.importingPresets = false;
+        this.syncSavedPresetControls();
+      }
+    };
     el('motion-saved-presets').onchange = () => {
       this.presetEdit = null;
       el('motion-preset-form').hidden = true;
@@ -509,6 +573,10 @@ export class MotionEditor {
     for (const action of ['apply', 'rename', 'delete'])
       el<HTMLButtonElement>(`motion-preset-${action}`).disabled =
         this.busy || !preset || (action === 'apply' && incompatible);
+    el<HTMLButtonElement>('motion-preset-import').disabled = this.busy || this.importingPresets;
+    el<HTMLButtonElement>('motion-preset-export').disabled = this.busy || !preset;
+    el<HTMLButtonElement>('motion-preset-export-all').disabled =
+      this.busy || !this.savedMotionPresets.length;
     el('motion-preset-compatibility').hidden = !incompatible;
   }
   private syncPresets() {

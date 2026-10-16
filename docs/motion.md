@@ -33,7 +33,15 @@ Under **Your animation presets**, click **Save**, enter a name, then save the cu
 
 Use **Rename preset** to change the selected name, or **Delete preset** to remove it from the library. Deleting a preset leaves the current animation unchanged. Save creates a separate copy: editing the stack afterward does not update a saved preset. To save a variation, give it a new name. Names are trimmed, case-insensitively unique, and limited to 60 characters. You can keep up to 50 animation presets.
 
-Presets stay in this browser for this site; they do not sync between devices and clearing site data removes them. Projects still preserve the current animation separately. The preset library contains no source media, image recipes or timeline keys. Palette-dependent presets can only be applied in Palette color mode. Storage failures keep the name form open for retry, and an unreadable library is reported rather than replaced.
+Presets stay in this browser for this site; they do not automatically sync between devices and clearing site data removes them. Export a JSON backup to keep them or move them to another browser. Projects still preserve the current animation separately. The preset library contains no source media, image recipes or timeline keys. Palette-dependent presets can only be applied in Palette color mode. Storage failures keep the name form open for retry, and an unreadable library is reported rather than replaced.
+
+### Import and export animation presets
+
+Select a saved preset and choose **Export selected** to share one look, or choose **Export all** to back up the entire library. Both download a JSON file containing names, source motion and effect stacks. Browser-local IDs, images, videos, image recipes and timeline keys are excluded.
+
+Choose **Import presets** and select an exported JSON file to merge it into this browser's library. Imports create new copies and leave the current animation unchanged. Duplicate names, including case-insensitive matches, get numbered suffixes such as `Lake (2)`. Select an imported preset and click **Apply preset** when ready.
+
+Files use `type: "dither4all-animation-presets"`, `version: 1`, and a `presets` array containing `name` and `appearance` for each entry. One file can contain 1–50 presets and must be at most 256 KB. Every entry must pass the same source-motion and effect validation used by the editor. Imports are all-or-nothing: malformed/unsupported files, capacity errors or storage failures leave the existing library unchanged. Delete unwanted presets if an import would exceed 50 saved presets; export a backup first if you want to keep them.
 
 ## Stackable motion effects
 
