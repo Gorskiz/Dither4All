@@ -3,7 +3,12 @@ import { canvasPixels } from '../files';
 import { makeSample } from '../sample';
 import { drawMotion } from './media';
 import { animateNoise, motionAt, settingsAt, timelineDefaults } from './model';
-import { applyMotionPreset } from './presets';
+import {
+  applyMotionAppearance,
+  applyMotionPreset,
+  captureMotionAppearance,
+  type MotionAppearance,
+} from './presets';
 import { FrameProcessor } from './processor';
 
 const WIDTH = 96,
@@ -11,7 +16,10 @@ const WIDTH = 96,
 export const PREVIEW_FPS = 8,
   PREVIEW_FRAMES = 32;
 interface Preview {
-  card: HTMLButtonElement;
+  card: HTMLElement;
+  appearance: MotionAppearance;
+  revision: number;
+  available: boolean;
   canvas: HTMLCanvasElement;
   frames: ImageData[];
   failed: boolean;
@@ -21,6 +29,9 @@ export class MotionPresetPreviews {
   private processor = new FrameProcessor();
   private observer: IntersectionObserver;
   private previews: Preview[];
+  private custom: Preview | undefined;
+  private customSignature = '';
+  private toggles: { button: HTMLButtonElement; play: string; pause: string }[] = [];
   private visible = new Set<Element>();
   private reduced = matchMedia('(prefers-reduced-motion: reduce)');
   private userPaused = this.reduced.matches;
@@ -43,20 +54,23 @@ export class MotionPresetPreviews {
 
   constructor(
     root: HTMLElement,
-    private toggle: HTMLButtonElement,
+    toggle: HTMLButtonElement,
+    custom?: { card: HTMLElement; toggle: HTMLButtonElement },
   ) {
     this.previews = [...root.querySelectorAll<HTMLButtonElement>('[data-motion-preset]')].map(
-      (card) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = WIDTH;
-        canvas.height = HEIGHT;
-        canvas.className = 'motion-look-preview';
-        canvas.setAttribute('aria-hidden', 'true');
-        card.prepend(canvas);
-        card.dataset.preview = 'pending';
-        return { card, canvas, frames: [], failed: false };
-      },
+      (card) =>
+        this.createPreview(
+          card,
+          applyMotionPreset(timelineDefaults(4), card.dataset.motionPreset!),
+        ),
     );
+    this.bindToggle(toggle, 'Play previews', 'Pause previews');
+    if (custom) {
+      this.custom = this.createPreview(custom.card, timelineDefaults(4));
+      this.custom.available = false;
+      this.previews.push(this.custom);
+      this.bindToggle(custom.toggle, 'Play all previews', 'Pause all previews');
+    }
     this.observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -68,14 +82,55 @@ export class MotionPresetPreviews {
       { threshold: 0.01 },
     );
     this.previews.forEach(({ card }) => this.observer.observe(card));
-    toggle.onclick = () => {
-      this.userPaused = !this.userPaused;
-      this.update();
-    };
     this.reduced.addEventListener('change', this.onReducedMotion);
     document.addEventListener('visibilitychange', this.onVisibility);
     window.addEventListener('pagehide', this.onPageHide);
     window.addEventListener('pageshow', this.onVisibility);
+    this.update();
+  }
+  private createPreview(card: HTMLElement, appearance: MotionAppearance): Preview {
+    const canvas = document.createElement('canvas');
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+    canvas.className = 'motion-look-preview';
+    canvas.setAttribute('aria-hidden', 'true');
+    card.prepend(canvas);
+    card.dataset.preview = 'pending';
+    return {
+      card,
+      canvas,
+      appearance: captureMotionAppearance(appearance),
+      revision: 0,
+      available: true,
+      frames: [],
+      failed: false,
+    };
+  }
+  private bindToggle(button: HTMLButtonElement, play: string, pause: string) {
+    this.toggles.push({ button, play, pause });
+    button.onclick = () => {
+      this.userPaused = !this.userPaused;
+      this.update();
+    };
+  }
+  /** Reuse one custom card/cache. Revisions discard stale worker replies after selection changes. */
+  setCustomAppearance(value: MotionAppearance | null) {
+    const p = this.custom;
+    if (!p || this.disposed) return;
+    const signature = value ? JSON.stringify(value) : '';
+    if (signature === this.customSignature) return;
+    const appearance = value ? captureMotionAppearance(value) : null;
+    this.customSignature = signature;
+    p.revision++;
+    p.available = !!appearance;
+    if (appearance) p.appearance = appearance;
+    else this.visible.delete(p.card);
+    p.frames.length = 0;
+    p.failed = false;
+    p.canvas.getContext('2d')!.clearRect(0, 0, WIDTH, HEIGHT);
+    p.card.dataset.preview = 'pending';
+    delete p.card.dataset.previewFrame;
+    p.card.querySelector('.motion-preview-error')?.remove();
     this.update();
   }
   setSuspended(value: boolean) {
@@ -90,6 +145,7 @@ export class MotionPresetPreviews {
     return this.previews.filter(
       (p) =>
         this.visible.has(p.card) &&
+        p.available &&
         !p.failed &&
         p.frames.length < (this.userPaused ? 1 : PREVIEW_FRAMES),
     );
@@ -101,7 +157,8 @@ export class MotionPresetPreviews {
   }
   private update() {
     if (this.disposed) return;
-    this.toggle.textContent = this.userPaused ? 'Play previews' : 'Pause previews';
+    for (const { button, play, pause } of this.toggles)
+      button.textContent = this.userPaused ? play : pause;
     if (!this.canRender()) {
       this.stop();
       return;
@@ -120,7 +177,7 @@ export class MotionPresetPreviews {
     const index =
       Math.floor(((performance.now() - this.origin) / 1000) * PREVIEW_FPS) % PREVIEW_FRAMES;
     for (const p of this.previews) {
-      if (!this.visible.has(p.card) || p.failed) continue;
+      if (!this.visible.has(p.card) || !p.available || p.failed) continue;
       const frame = p.frames[index] ? index : 0;
       this.draw(p, frame);
     }
@@ -139,11 +196,12 @@ export class MotionPresetPreviews {
         if (!jobs.length) break;
         const p = jobs[this.cursor++ % jobs.length];
         const index = p.frames.length;
+        const revision = p.revision;
         const abort = new AbortController();
         const deadline = setTimeout(() => abort.abort(), 1500);
         try {
           this.sample ??= makeSample();
-          const t = applyMotionPreset(timelineDefaults(4), p.card.dataset.motionPreset!);
+          const t = applyMotionAppearance(timelineDefaults(4), p.appearance);
           t.fps = PREVIEW_FPS;
           const time = index / PREVIEW_FPS;
           const settings = cloneSettings(defaults);
@@ -159,11 +217,13 @@ export class MotionPresetPreviews {
             motionAt(t, time),
           );
           if (this.disposed) break;
+          if (p.revision !== revision) continue;
           p.frames.push(new ImageData(new Uint8ClampedArray(result.data), WIDTH, HEIGHT));
           p.card.dataset.preview = p.frames.length === PREVIEW_FRAMES ? 'ready' : 'poster';
           if (this.visible.has(p.card) && this.canRender() && !p.card.dataset.previewFrame)
             this.draw(p, 0);
         } catch (error) {
+          if (p.revision !== revision) continue;
           if (
             abort.signal.aborted ||
             !(error instanceof DOMException && error.name === 'AbortError')
@@ -197,6 +257,9 @@ export class MotionPresetPreviews {
     window.removeEventListener('pagehide', this.onPageHide);
     window.removeEventListener('pageshow', this.onVisibility);
     this.visible.clear();
+    this.toggles.forEach(({ button }) => {
+      button.onclick = null;
+    });
     this.previews.forEach((p) => {
       p.frames.length = 0;
     });

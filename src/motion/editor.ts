@@ -112,6 +112,7 @@ export class MotionEditor {
         <div class="section-title motion-subheading"><h3>Your animation presets</h3><button id="motion-preset-save" class="small-link" aria-label="Save animation preset">Save</button></div>
         <p class="hint">Save source motion and the current stack. Stored in this browser only, up to 50 presets.</p>
         <label class="sr-only" for="motion-saved-presets">Your saved animation presets</label><select id="motion-saved-presets"><option value="">Choose a preset…</option></select>
+        <div id="motion-saved-preview-region" hidden><div class="section-title motion-saved-preview-heading"><h4>Selected preset preview</h4><button id="motion-saved-preview-toggle" class="small-link" type="button">Pause all previews</button></div><figure id="motion-saved-preview" class="motion-custom-preview"><figcaption><strong id="motion-saved-preview-name"></strong><span>Sample only. Choose Apply preset to use this look.</span></figcaption></figure></div>
         <div class="two-buttons motion-preset-actions"><button id="motion-preset-apply">Apply preset</button><button id="motion-preset-rename">Rename preset</button><button id="motion-preset-delete">Delete preset</button></div>
         <div class="two-buttons motion-preset-actions"><button id="motion-preset-import">Import presets</button><button id="motion-preset-export">Export selected</button><button id="motion-preset-export-all">Export all</button></div>
         <input id="motion-preset-file" type="file" accept=".json,application/json" hidden aria-label="Import animation preset file">
@@ -153,6 +154,10 @@ export class MotionEditor {
     this.lookPreviews = new MotionPresetPreviews(
       document.querySelector('.motion-looks')!,
       el<HTMLButtonElement>('motion-preview-toggle'),
+      {
+        card: el('motion-saved-preview'),
+        toggle: el<HTMLButtonElement>('motion-saved-preview-toggle'),
+      },
     );
     el('sample').insertAdjacentHTML(
       'afterend',
@@ -573,6 +578,9 @@ export class MotionEditor {
     const preset = this.savedMotionPresets.find(
       (p) => p.id === el<HTMLSelectElement>('motion-saved-presets').value,
     );
+    el('motion-saved-preview-region').hidden = !preset;
+    el('motion-saved-preview-name').textContent = preset?.name ?? '';
+    this.lookPreviews.setCustomAppearance(preset?.appearance ?? null);
     const incompatible =
       !!preset && this.needsPalette(preset) && this.host.settings().colorMode !== 'palette';
     el<HTMLButtonElement>('motion-preset-save').disabled =

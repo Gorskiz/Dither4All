@@ -1425,3 +1425,39 @@ dialog > a {
   font-size: 10px;
   margin-top: 5px;
 }
+
+.motion-saved-preview-heading {
+  margin-top: 10px;
+}
+.motion-saved-preview-heading h4 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+.motion-custom-preview {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.motion-custom-preview canvas {
+  margin: 0;
+}
+.motion-custom-preview strong,
+.motion-custom-preview span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.motion-custom-preview strong {
+  font-size: 12px;
+}
+.motion-custom-preview span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
