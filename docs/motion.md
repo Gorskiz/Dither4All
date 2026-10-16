@@ -27,6 +27,14 @@ Under **Animation looks**, click a named look to replace source motion and the m
 
 These motion looks are separate from saved image style presets. Apply a look, press Play to watch it, then adjust individual layers as needed.
 
+## Your saved animation presets
+
+Under **Your animation presets**, click **Save**, enter a name, then save the current source-motion settings and ordered stack, including disabled layers and each layer's amount, cycles and phase. Select a saved preset and click **Apply preset** to use it on any image or video. Applying it replaces source motion and the stack while preserving image settings, duration, trim, FPS, loop, playhead and adjustment keyframes.
+
+Use **Rename preset** to change the selected name, or **Delete preset** to remove it from the library. Deleting a preset leaves the current animation unchanged. Save creates a separate copy: editing the stack afterward does not update a saved preset. To save a variation, give it a new name. Names are trimmed, case-insensitively unique, and limited to 60 characters. You can keep up to 50 animation presets.
+
+Presets stay in this browser for this site; they do not sync between devices and clearing site data removes them. Projects still preserve the current animation separately. The preset library contains no source media, image recipes or timeline keys. Palette-dependent presets can only be applied in Palette color mode. Storage failures keep the name form open for retry, and an unreadable library is reported rather than replaced.
+
 ## Stackable motion effects
 
 Choose an effect under **Motion stack** and click **Add effect**. Combine up to eight entries, including repeated effects. Entries run from top to bottom after the image's dithering and static effects. Toggle **Enabled**, use ↑ / ↓ to reorder, or × to remove an entry. Each entry has its own **Amount** (0–100), **Cycles** (1–8 over the selection), and **Phase** (0–360°). Zero amount and disabled entries leave pixels unchanged.

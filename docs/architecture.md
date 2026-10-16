@@ -27,6 +27,7 @@ Batch snapshots the settings at its start, decodes one image at a time, and coll
 ## Persistence and privacy
 
 - `localStorage['dither4all-presets']`: up to 50 named settings objects, validated on read.
+- `localStorage['dither4all-motion-presets']`: up to 50 named animation appearances with stable IDs, validated source motion and ordered effects. No media, image recipe or timeline keys. Reads reject malformed libraries; writes report unavailable/full storage. Rename/delete operate on IDs and refresh against storage before writing. Storage events refresh other tabs.
 - URL `#recipe=`: settings JSON only. No image bytes.
 - `.d4a`: versioned JSON with settings, a source name, and an embedded PNG image.
 - No network writes, account system, cookies, analytics, or service APIs.
@@ -38,6 +39,8 @@ Batch snapshots the settings at its start, decodes one image at a time, and coll
 `src/motion/catalog.ts` defines and validates up to eight ordered motion effects with independent amount, integer cycles, phase and enabled state. Legacy timelines missing the stack normalize to an empty array. `motionAt` provides normalized selection progress and `sampleTime` aligns scrubbing/playback to export timestamps. `src/motion/effects.ts` evaluates the stack after `processImage` in the worker, shared by preview, current-frame exports and all animation formats. It has no wall-clock or previous-frame dependency. Flow uses seeded 4D simplex noise sampled on a bounded vector grid with circular time coordinates; geometry samples RGBA together. Palette cycling preserves alpha and rotates swatches using a fixed coverage mask, with bounded nearest-color matching when earlier effects changed colors. It is skipped with a notice in RGB mode. Stack operations remain cancellable through the processor's worker termination/watchdog.
 
 `src/motion/presets.ts` defines six curated animation looks and pure helpers for applying and recognizing them. Looks replace only source-motion appearance and the ordered stack; timing and adjustment keys are preserved. Selection is derived from the actual settings rather than persisted as a preset ID, so edits and project restoration remain consistent. Palette-dependent looks are unavailable in RGB mode.
+
+`src/motion/saved-presets.ts` owns bounded browser persistence for custom animation appearances. Both built-in looks and saved presets use the same appearance capture/application helpers, which copy only source motion and the effect stack. Applying either retains timing and adjustment keys.
 
 `src/motion/editor.ts` owns playback, trim, and scrubbing. Preview uses a persistent worker through `processor.ts`, displays frames at up to 640 px and 12 fps, and skips outdated work. The wall clock drives playback so slow processing does not stretch the timeline. Preview is silent. Decoding uses a bounded CanvasSink, honoring display orientation and timestamps.
 

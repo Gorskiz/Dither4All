@@ -21,7 +21,21 @@ import {
   newMotionEffect,
   type MotionEffectType,
 } from './catalog';
-import { applyMotionPreset, matchesMotionPreset, motionPresets } from './presets';
+import {
+  applyMotionAppearance,
+  applyMotionPreset,
+  matchesMotionPreset,
+  motionPresets,
+} from './presets';
+import {
+  MOTION_PRESETS_KEY,
+  MAX_SAVED_MOTION_PRESETS,
+  loadSavedMotionPresets,
+  saveMotionPreset,
+  renameMotionPreset,
+  deleteMotionPreset,
+  type SavedMotionPreset,
+} from './saved-presets';
 import type { CanvasSink } from 'mediabunny';
 
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -65,6 +79,8 @@ export class MotionEditor {
   private pendingVideo: MotionProject['video'];
   private name = 'animation';
   private openVersion = 0;
+  private savedMotionPresets: SavedMotionPreset[] = [];
+  private presetEdit: { kind: 'save' } | { kind: 'rename'; id: string } | null = null;
   constructor(private host: Host) {
     document.querySelector('.canvas-bottom')!.insertAdjacentHTML(
       'beforebegin',
@@ -87,6 +103,13 @@ export class MotionEditor {
         <div class="section-title motion-subheading"><h3>Animation looks</h3></div>
         <p class="hint" id="motion-looks-help">One click replaces source motion and the stack. Your image settings, trim and keyframes stay as they are.</p>
         <div class="motion-looks" role="group" aria-label="Animation looks" aria-describedby="motion-looks-help">${motionPresets.map((p) => `<button type="button" class="motion-look" data-motion-preset="${p.id}" aria-pressed="false"><strong>${p.name}</strong><span>${p.description}</span></button>`).join('')}</div>
+        <div class="section-title motion-subheading"><h3>Your animation presets</h3><button id="motion-preset-save" class="small-link" aria-label="Save animation preset">Save</button></div>
+        <p class="hint">Save source motion and the current stack. Stored in this browser only, up to 50 presets.</p>
+        <label class="sr-only" for="motion-saved-presets">Your saved animation presets</label><select id="motion-saved-presets"><option value="">Choose a preset…</option></select>
+        <div class="two-buttons motion-preset-actions"><button id="motion-preset-apply">Apply preset</button><button id="motion-preset-rename">Rename preset</button><button id="motion-preset-delete">Delete preset</button></div>
+        <p id="motion-preset-compatibility" class="hint" hidden>Switch to Palette color mode to apply this preset.</p>
+        <form id="motion-preset-form" class="inline-preset" hidden><label class="field-label" for="motion-preset-name">Animation preset name</label><input id="motion-preset-name" maxlength="60" required><div class="two-buttons"><button type="submit" class="outline-button" id="motion-preset-submit">Save</button><button type="button" id="motion-preset-cancel">Cancel</button></div></form>
+        <p id="motion-preset-status" class="hint" role="status"></p>
         <div class="field-row"><label for="motion-effect">Source motion</label><select id="motion-effect"><option value="none">None · source movement</option><option value="boil">Noise boil</option><option value="pulse">Brightness pulse</option><option value="zoom">Looping zoom</option><option value="pan">Horizontal drift</option></select></div>
         <div class="field-row"><label for="motion-amount">Amount</label><input id="motion-amount" type="range" min="0" max="100" value="35"></div>
         <div class="field-row"><label for="motion-cycles">Cycles</label><input id="motion-cycles" type="number" min="1" max="8" value="1"></div>
@@ -198,6 +221,115 @@ export class MotionEditor {
         }
       };
     });
+    const selectedPreset = () =>
+      this.savedMotionPresets.find(
+        (p) => p.id === el<HTMLSelectElement>('motion-saved-presets').value,
+      );
+    const manage = (action: () => void) => {
+      try {
+        this.assertIdle();
+        action();
+      } catch (error) {
+        el('motion-preset-status').textContent =
+          error instanceof Error ? error.message : 'Could not update animation presets.';
+      }
+    };
+    bind('motion-preset-save', () =>
+      manage(() => {
+        this.presetEdit = { kind: 'save' };
+        el('motion-preset-form').hidden = false;
+        el('motion-preset-submit').textContent = 'Save';
+        el<HTMLInputElement>('motion-preset-name').value = '';
+        el('motion-preset-status').textContent = '';
+        el('motion-preset-name').focus();
+      }),
+    );
+    bind('motion-preset-rename', () =>
+      manage(() => {
+        const preset = selectedPreset();
+        if (!preset) return;
+        el('motion-preset-status').textContent = '';
+        this.presetEdit = { kind: 'rename', id: preset.id };
+        el('motion-preset-form').hidden = false;
+        el('motion-preset-submit').textContent = 'Rename';
+        const input = el<HTMLInputElement>('motion-preset-name');
+        input.value = preset.name;
+        input.focus();
+        input.select();
+      }),
+    );
+    bind('motion-preset-cancel', () => {
+      this.presetEdit = null;
+      el('motion-preset-form').hidden = true;
+      el('motion-saved-presets').focus();
+    });
+    el('motion-preset-form').onsubmit = (event) => {
+      event.preventDefault();
+      manage(() => {
+        if (!this.presetEdit) return;
+        const name = el<HTMLInputElement>('motion-preset-name').value;
+        const id = this.presetEdit.kind === 'rename' ? this.presetEdit.id : crypto.randomUUID();
+        const renamed = this.presetEdit.kind === 'rename';
+        const presets = renamed
+          ? renameMotionPreset(localStorage, id, name)
+          : saveMotionPreset(localStorage, name, this.t, id);
+        this.savedMotionPresets = presets;
+        this.renderSavedPresets(id);
+        this.presetEdit = null;
+        el('motion-preset-form').hidden = true;
+        el('motion-preset-status').textContent = renamed
+          ? 'Animation preset renamed.'
+          : 'Animation preset saved in this browser.';
+        el('motion-saved-presets').focus();
+      });
+    };
+    bind('motion-preset-delete', () =>
+      manage(() => {
+        const preset = selectedPreset();
+        if (!preset) return;
+        this.savedMotionPresets = deleteMotionPreset(localStorage, preset.id);
+        this.renderSavedPresets();
+        this.presetEdit = null;
+        el('motion-preset-form').hidden = true;
+        el('motion-preset-status').textContent =
+          `Deleted “${preset.name}”. Current animation kept.`;
+        el('motion-saved-presets').focus();
+      }),
+    );
+    bind('motion-preset-apply', () =>
+      manage(() => {
+        const preset = selectedPreset();
+        if (!preset) return;
+        if (this.needsPalette(preset) && this.host.settings().colorMode !== 'palette')
+          throw new Error('This animation preset requires Palette color mode.');
+        const playing = this.playing;
+        this.pause();
+        this.t = validateTimeline(applyMotionAppearance(this.t, preset.appearance), this.duration);
+        this.sync();
+        this.refresh();
+        el('motion-preset-status').textContent =
+          `Applied “${preset.name}”. Source motion and stack replaced.`;
+        if (playing) this.play();
+      }),
+    );
+    el('motion-saved-presets').onchange = () => {
+      this.presetEdit = null;
+      el('motion-preset-form').hidden = true;
+      this.syncSavedPresetControls();
+    };
+    const loadSaved = () => {
+      try {
+        this.savedMotionPresets = loadSavedMotionPresets(localStorage);
+        this.renderSavedPresets(el<HTMLSelectElement>('motion-saved-presets').value);
+      } catch (error) {
+        el('motion-preset-status').textContent =
+          error instanceof Error ? error.message : 'Could not read animation presets.';
+      }
+    };
+    loadSaved();
+    window.addEventListener('storage', (event) => {
+      if (event.key === MOTION_PRESETS_KEY || event.key === null) loadSaved();
+    });
     bind('motion-add', () => {
       this.assertIdle();
       this.pause();
@@ -233,6 +365,8 @@ export class MotionEditor {
       throw new Error('Cancel or finish the animation export before opening another source.');
   }
   reset() {
+    this.presetEdit = null;
+    el('motion-preset-form').hidden = true;
     this.pause();
     ++this.openVersion;
     this.active = false;
@@ -353,7 +487,32 @@ export class MotionEditor {
     this.keys();
     this.keyValue();
   }
+  private needsPalette(preset: SavedMotionPreset) {
+    return preset.appearance.effects.some((e) => e.type === 'palette' && e.enabled && e.amount > 0);
+  }
+  private renderSavedPresets(selected = '') {
+    const select = el<HTMLSelectElement>('motion-saved-presets');
+    select.replaceChildren(new Option('Choose a preset…', ''));
+    for (const preset of this.savedMotionPresets) select.add(new Option(preset.name, preset.id));
+    select.value = selected;
+    if (select.selectedIndex < 0) select.value = '';
+    this.syncSavedPresetControls();
+  }
+  private syncSavedPresetControls() {
+    const preset = this.savedMotionPresets.find(
+      (p) => p.id === el<HTMLSelectElement>('motion-saved-presets').value,
+    );
+    const incompatible =
+      !!preset && this.needsPalette(preset) && this.host.settings().colorMode !== 'palette';
+    el<HTMLButtonElement>('motion-preset-save').disabled =
+      this.busy || this.savedMotionPresets.length >= MAX_SAVED_MOTION_PRESETS;
+    for (const action of ['apply', 'rename', 'delete'])
+      el<HTMLButtonElement>(`motion-preset-${action}`).disabled =
+        this.busy || !preset || (action === 'apply' && incompatible);
+    el('motion-preset-compatibility').hidden = !incompatible;
+  }
   private syncPresets() {
+    this.syncSavedPresetControls();
     document.querySelectorAll<HTMLButtonElement>('[data-motion-preset]').forEach((button) => {
       const preset = motionPresets.find((p) => p.id === button.dataset.motionPreset)!;
       button.setAttribute('aria-pressed', String(matchesMotionPreset(this.t, preset.id)));

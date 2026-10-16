@@ -36,7 +36,7 @@ test('image editor processes locally, compares, edits, undoes, and exports real 
   await page.getByRole('button', { name: 'Add an effect', exact: true }).click();
   await expect(page.locator('.effect-layer')).toHaveCount(1);
   await page.getByRole('button', { name: 'Save preset', exact: true }).click();
-  await page.getByLabel('Preset name').fill('Browser test');
+  await page.getByLabel('Preset name', { exact: true }).fill('Browser test');
   await page.locator('#name-form').getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.locator('#saved-presets')).toContainText('Browser test');
   for (const format of ['png', 'jpg', 'webp', 'svg', 'svg-black']) {

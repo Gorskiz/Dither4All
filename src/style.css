@@ -1393,3 +1393,18 @@ dialog > a {
 .motion-look[aria-pressed='true'] strong {
   color: var(--accent);
 }
+
+#motion-saved-presets,
+#motion-preset-name {
+  width: 100%;
+  min-width: 0;
+  margin-top: 8px;
+}
+.motion-preset-actions {
+  margin: 6px 0;
+  flex-wrap: wrap;
+}
+#motion-preset-status {
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}

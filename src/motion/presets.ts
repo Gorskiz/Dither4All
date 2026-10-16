@@ -4,7 +4,30 @@ import {
   type MotionEffect,
   type MotionEffectType,
 } from './catalog';
-import type { Timeline } from './model';
+import { timelineDefaults, validateTimeline, type Timeline } from './model';
+
+export type MotionAppearance = Pick<Timeline, 'effect' | 'amount' | 'cycles' | 'effects'>;
+export function captureMotionAppearance(value: MotionAppearance): MotionAppearance {
+  const validated = validateTimeline(
+    {
+      ...timelineDefaults(),
+      effect: value.effect,
+      amount: value.amount,
+      cycles: value.cycles,
+      effects: validateMotionEffects(value.effects),
+    },
+    4,
+  );
+  return {
+    effect: validated.effect,
+    amount: validated.amount,
+    cycles: validated.cycles,
+    effects: validated.effects,
+  };
+}
+export function applyMotionAppearance(timeline: Timeline, appearance: MotionAppearance): Timeline {
+  return { ...structuredClone(timeline), ...captureMotionAppearance(appearance) };
+}
 
 interface MotionPreset {
   id: string;
@@ -71,11 +94,7 @@ export const motionPresets: readonly MotionPreset[] = [
 export function applyMotionPreset(timeline: Timeline, id: string): Timeline {
   const preset = motionPresets.find((p) => p.id === id);
   if (!preset) throw new Error('Unknown motion look.');
-  return {
-    ...structuredClone(timeline),
-    ...preset.source,
-    effects: validateMotionEffects(preset.effects),
-  };
+  return applyMotionAppearance(timeline, { ...preset.source, effects: [...preset.effects] });
 }
 
 /** Derive selection from editable settings, so saved projects need no preset identifier. */
