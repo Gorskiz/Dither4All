@@ -1,4 +1,4 @@
-import { cloneSettings, defaults } from '../engine/catalog';
+import { cloneSettings, defaults, type Settings } from '../engine/catalog';
 import { canvasPixels } from '../files';
 import { makeSample } from '../sample';
 import { drawMotion } from './media';
@@ -40,6 +40,12 @@ export class MotionPresetPreviews {
   private running = false;
   private timer: ReturnType<typeof setInterval> | undefined;
   private sample: HTMLCanvasElement | undefined;
+  private currentSource: HTMLCanvasElement | null = null;
+  private currentImage: HTMLCanvasElement | undefined;
+  private currentSettings: Settings | undefined;
+  private inputSignature = '';
+  private width = WIDTH;
+  private height = HEIGHT;
   private origin = performance.now();
   private cursor = 0;
   private onVisibility = () => this.update();
@@ -90,8 +96,8 @@ export class MotionPresetPreviews {
   }
   private createPreview(card: HTMLElement, appearance: MotionAppearance): Preview {
     const canvas = document.createElement('canvas');
-    canvas.width = WIDTH;
-    canvas.height = HEIGHT;
+    canvas.width = this.width;
+    canvas.height = this.height;
     canvas.className = 'motion-look-preview';
     canvas.setAttribute('aria-hidden', 'true');
     card.prepend(canvas);
@@ -127,10 +133,50 @@ export class MotionPresetPreviews {
     else this.visible.delete(p.card);
     p.frames.length = 0;
     p.failed = false;
-    p.canvas.getContext('2d')!.clearRect(0, 0, WIDTH, HEIGHT);
+    p.canvas.getContext('2d')!.clearRect(0, 0, p.canvas.width, p.canvas.height);
     p.card.dataset.preview = 'pending';
     delete p.card.dataset.previewFrame;
     p.card.querySelector('.motion-preview-error')?.remove();
+    this.update();
+  }
+  /** Source/recipe changes invalidate every cache, without retaining full-size image copies. */
+  setInput(source: HTMLCanvasElement | null, settings?: Settings, referenceSide = 720) {
+    if (this.disposed) return;
+    const signature = source ? JSON.stringify({ settings, referenceSide }) : '';
+    if (source === this.currentSource && signature === this.inputSignature) return;
+    this.currentSource = source;
+    this.inputSignature = signature;
+    this.currentImage = undefined;
+    this.currentSettings = undefined;
+    this.width = WIDTH;
+    this.height = HEIGHT;
+    if (source) {
+      const ratio = Math.min(WIDTH / source.width, HEIGHT / source.height);
+      this.width = Math.max(1, Math.round(source.width * ratio));
+      this.height = Math.max(1, Math.round(source.height * ratio));
+      const image = document.createElement('canvas');
+      image.width = this.width;
+      image.height = this.height;
+      image.getContext('2d')!.drawImage(source, 0, 0, this.width, this.height);
+      this.currentImage = image;
+      this.currentSettings = cloneSettings(settings ?? defaults);
+      const outputSide = Math.min(Math.max(source.width, source.height), referenceSide);
+      this.currentSettings.scale = Math.max(
+        1,
+        Math.round((this.currentSettings.scale * Math.max(this.width, this.height)) / outputSide),
+      );
+    }
+    for (const p of this.previews) {
+      p.revision++;
+      p.frames.length = 0;
+      p.failed = false;
+      p.canvas.width = this.width;
+      p.canvas.height = this.height;
+      p.card.dataset.preview = 'pending';
+      delete p.card.dataset.previewFrame;
+      p.card.querySelector('.motion-preview-error')?.remove();
+    }
+    this.stop();
     this.update();
   }
   setSuspended(value: boolean) {
@@ -200,15 +246,23 @@ export class MotionPresetPreviews {
         const abort = new AbortController();
         const deadline = setTimeout(() => abort.abort(), 1500);
         try {
-          this.sample ??= makeSample();
+          if (!this.currentImage) this.sample ??= makeSample();
           const t = applyMotionAppearance(timelineDefaults(4), p.appearance);
           t.fps = PREVIEW_FPS;
           const time = index / PREVIEW_FPS;
-          const settings = cloneSettings(defaults);
-          settings.scale = 1;
-          settings.palette = ['#162c46', '#467b87', '#b2cba4', '#f1e6c2'];
+          const settings = cloneSettings(this.currentSettings ?? defaults);
+          if (!this.currentSettings) {
+            settings.scale = 1;
+            settings.palette = ['#162c46', '#467b87', '#b2cba4', '#f1e6c2'];
+          }
           const s = settingsAt(settings, t, time);
-          const raw = drawMotion(this.sample, WIDTH, HEIGHT, t, time);
+          const raw = drawMotion(
+            this.currentImage ?? this.sample!,
+            this.width,
+            this.height,
+            t,
+            time,
+          );
           const result = await this.processor.process(
             animateNoise(canvasPixels(raw), t, time, s.seed),
             s,
@@ -218,7 +272,9 @@ export class MotionPresetPreviews {
           );
           if (this.disposed) break;
           if (p.revision !== revision) continue;
-          p.frames.push(new ImageData(new Uint8ClampedArray(result.data), WIDTH, HEIGHT));
+          p.frames.push(
+            new ImageData(new Uint8ClampedArray(result.data), result.width, result.height),
+          );
           p.card.dataset.preview = p.frames.length === PREVIEW_FRAMES ? 'ready' : 'poster';
           if (this.visible.has(p.card) && this.canRender() && !p.card.dataset.previewFrame)
             this.draw(p, 0);
@@ -264,5 +320,8 @@ export class MotionPresetPreviews {
       p.frames.length = 0;
     });
     this.sample = undefined;
+    this.currentSource = null;
+    this.currentImage = undefined;
+    this.currentSettings = undefined;
   }
 }

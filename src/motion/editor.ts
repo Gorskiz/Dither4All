@@ -84,6 +84,7 @@ export class MotionEditor {
   private name = 'animation';
   private openVersion = 0;
   private lookPreviews: MotionPresetPreviews;
+  private previewCurrentImage = false;
   private importingPresets = false;
   private savedMotionPresets: SavedMotionPreset[] = [];
   private presetEdit: { kind: 'save' } | { kind: 'rename'; id: string } | null = null;
@@ -107,12 +108,14 @@ export class MotionEditor {
         <div class="motion-trim"><label>In (s)<input id="motion-in" type="number" min="0" step="0.01" value="0"></label><label>Out (s)<input id="motion-out" type="number" min="0.01" step="0.01" value="4"></label><label>FPS<select id="motion-fps" aria-label="FPS"><option>6</option><option selected>12</option><option>24</option><option>30</option></select></label></div>
         <p class="hint">Export a selection up to 30 seconds. Preview adapts to your device.</p>
         <div class="section-title motion-subheading"><h3>Animation looks</h3><button id="motion-preview-toggle" class="small-link" type="button">Pause previews</button></div>
-        <p class="hint" id="motion-looks-help">Sample previews show each look. One click replaces source motion and the stack. Your image settings, trim and keyframes stay as they are.</p>
+        <label class="toggle-row motion-preview-source"><input id="motion-preview-current" type="checkbox"> Use current image for preset previews</label>
+        <p class="hint" id="motion-preview-source-note">Uses the sample image and a fixed palette for all preset previews.</p>
+        <p class="hint" id="motion-looks-help">Previews show each look without applying it. One click replaces source motion and the stack. Your image settings, trim and keyframes stay as they are.</p>
         <div class="motion-looks" role="group" aria-label="Animation looks" aria-describedby="motion-looks-help">${motionPresets.map((p) => `<button type="button" class="motion-look" data-motion-preset="${p.id}" aria-pressed="false"><strong>${p.name}</strong><span>${p.description}</span></button>`).join('')}</div>
         <div class="section-title motion-subheading"><h3>Your animation presets</h3><button id="motion-preset-save" class="small-link" aria-label="Save animation preset">Save</button></div>
         <p class="hint">Save source motion and the current stack. Stored in this browser only, up to 50 presets.</p>
         <label class="sr-only" for="motion-saved-presets">Your saved animation presets</label><select id="motion-saved-presets"><option value="">Choose a preset…</option></select>
-        <div id="motion-saved-preview-region" hidden><div class="section-title motion-saved-preview-heading"><h4>Selected preset preview</h4><button id="motion-saved-preview-toggle" class="small-link" type="button">Pause all previews</button></div><figure id="motion-saved-preview" class="motion-custom-preview"><figcaption><strong id="motion-saved-preview-name"></strong><span>Sample only. Choose Apply preset to use this look.</span></figcaption></figure></div>
+        <div id="motion-saved-preview-region" hidden><div class="section-title motion-saved-preview-heading"><h4>Selected preset preview</h4><button id="motion-saved-preview-toggle" class="small-link" type="button">Pause all previews</button></div><figure id="motion-saved-preview" class="motion-custom-preview"><figcaption><strong id="motion-saved-preview-name"></strong><span id="motion-saved-preview-note">Sample only. Choose Apply preset to use this look.</span></figcaption></figure></div>
         <div class="two-buttons motion-preset-actions"><button id="motion-preset-apply">Apply preset</button><button id="motion-preset-rename">Rename preset</button><button id="motion-preset-delete">Delete preset</button></div>
         <div class="two-buttons motion-preset-actions"><button id="motion-preset-import">Import presets</button><button id="motion-preset-export">Export selected</button><button id="motion-preset-export-all">Export all</button></div>
         <input id="motion-preset-file" type="file" accept=".json,application/json" hidden aria-label="Import animation preset file">
@@ -167,6 +170,10 @@ export class MotionEditor {
       (el(id).onclick = () => {
         Promise.resolve().then(fn).catch(host.error);
       });
+    el<HTMLInputElement>('motion-preview-current').onchange = () => {
+      this.previewCurrentImage = el<HTMLInputElement>('motion-preview-current').checked;
+      this.syncPreviewSource();
+    };
     bind('animate-image', () => this.animate());
     bind('motion-close', () => {
       this.assertIdle();
@@ -458,6 +465,7 @@ export class MotionEditor {
     if (this.active) this.host.cancelStill();
     el('timeline').hidden = !this.active;
     el('motion-section').hidden = !this.active;
+    this.syncPreviewSource();
     this.lookPreviews.setSuspended(!this.active || this.busy);
     el('animate-image').hidden = this.active;
     el('export').textContent = this.active ? 'Export animation' : 'Export image';
@@ -562,6 +570,25 @@ export class MotionEditor {
     this.stack();
     this.keys();
     this.keyValue();
+  }
+  private syncPreviewSource() {
+    const size =
+      el<HTMLSelectElement>('motion-format').value === 'gif'
+        ? Math.min(640, number('motion-size'))
+        : number('motion-size');
+    this.lookPreviews.setInput(
+      this.previewCurrentImage ? this.host.source() : null,
+      this.host.settings(),
+      size,
+    );
+    el('motion-preview-source-note').textContent = this.previewCurrentImage
+      ? this.video || this.pendingVideo
+        ? 'Uses the video poster and current image settings. Does not follow video playback.'
+        : 'Uses your current image and image settings for all preset previews.'
+      : 'Uses the sample image and a fixed palette for all preset previews.';
+    el('motion-saved-preview-note').textContent = this.previewCurrentImage
+      ? 'Current image preview. Choose Apply preset to use this look.'
+      : 'Sample only. Choose Apply preset to use this look.';
   }
   private needsPalette(preset: SavedMotionPreset) {
     return preset.appearance.effects.some((e) => e.type === 'palette' && e.enabled && e.amount > 0);
@@ -836,6 +863,7 @@ export class MotionEditor {
     el('render-status').textContent = 'Preview cancelled. Change a setting to render again.';
   }
   refresh() {
+    this.syncPreviewSource();
     this.syncPresets();
     const signature = JSON.stringify(this.host.settings()) + JSON.stringify(this.t);
     if (this.rendering && signature !== this.previewSignature) {

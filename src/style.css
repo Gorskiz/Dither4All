@@ -1461,3 +1461,11 @@ dialog > a {
   font-size: 10px;
   line-height: 1.5;
 }
+
+.motion-preview-source {
+  margin: 10px 0 5px;
+  font-size: 11px;
+}
+.motion-look-preview {
+  object-fit: contain;
+}
