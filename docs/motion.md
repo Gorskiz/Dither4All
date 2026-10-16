@@ -14,6 +14,19 @@ Under **Source motion**, choose None to preserve source movement, Noise boil for
 
 To animate an adjustment, move the playhead, select a property, enter its value and click Set key. Repeat at another time. Keys override the matching base adjustment; values hold before the first and after the last key. Interpolation can be smooth, linear or hold. Click a key in the list or a diamond below the timeline to seek; use × to remove it. Up to 200 keys are supported. Scale is rounded to whole pixels.
 
+## One-click animation looks
+
+Under **Animation looks**, click a named look to replace source motion and the motion stack with a curated combination. Image settings (including palette and dithering), duration, trim, FPS, loop, playhead and adjustment keyframes stay unchanged. Playback continues if it was already running. The selected look is highlighted; editing its effect controls clears the highlight. Projects save the resulting editable settings, so the look survives reopening without a special preset format.
+
+- **Liquid Ink:** flowing displacement and gentle ripples.
+- **Signal Loss:** glitch bursts and CRT roll.
+- **Aftershock:** expanding shockwaves and twist.
+- **Mirror Lake:** subtle flow and water reflection.
+- **Chromatic Tide:** palette cycling and flow. Available in Palette color mode.
+- **Orbital Drift:** looping zoom, twist and subtle CRT shading.
+
+These motion looks are separate from saved image style presets. Apply a look, press Play to watch it, then adjust individual layers as needed.
+
 ## Stackable motion effects
 
 Choose an effect under **Motion stack** and click **Add effect**. Combine up to eight entries, including repeated effects. Entries run from top to bottom after the image's dithering and static effects. Toggle **Enabled**, use ↑ / ↓ to reorder, or × to remove an entry. Each entry has its own **Amount** (0–100), **Cycles** (1–8 over the selection), and **Phase** (0–360°). Zero amount and disabled entries leave pixels unchanged.

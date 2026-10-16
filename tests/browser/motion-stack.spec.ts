@@ -141,3 +141,90 @@ test('stack limits, keyboard controls, accessibility and narrow layout', async (
   await page.getByRole('button', { name: 'Remove Palette cycling 8', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Add effect', exact: true })).toBeEnabled();
 });
+
+test('one-click animation looks preserve the timeline, stay editable, and round-trip with matching frame pixels', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await setup(page);
+  await page.getByLabel('In (s)', { exact: true }).fill('0.5');
+  await page.getByLabel('In (s)', { exact: true }).press('Tab');
+  await page.getByLabel('Out (s)', { exact: true }).fill('3.5');
+  await page.getByLabel('Out (s)', { exact: true }).press('Tab');
+  await page.getByLabel('Value', { exact: true }).fill('25');
+  await page.getByRole('button', { name: 'Set key', exact: true }).click();
+  const save = async () => {
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Save project', exact: true }).click();
+    return readFile((await (await download).path())!);
+  };
+  const original = JSON.parse((await save()).toString());
+  const looks = page.getByRole('group', { name: 'Animation looks', exact: true });
+  await expect(looks.getByRole('button')).toHaveCount(6);
+  for (const name of [
+    'Liquid Ink',
+    'Signal Loss',
+    'Aftershock',
+    'Mirror Lake',
+    'Chromatic Tide',
+    'Orbital Drift',
+  ]) {
+    const button = looks.getByRole('button', { name: new RegExp(`^${name}`) });
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#motion-stack-count')).toHaveText('2 / 8');
+    await expect(page.locator('#key-count')).toHaveText('1 / 200');
+  }
+  await expect(page.getByLabel('Source motion', { exact: true })).toHaveValue('zoom');
+  await looks.getByRole('button', { name: /^Aftershock/ }).click();
+  await expect(page.getByLabel('Source motion', { exact: true })).toHaveValue('none');
+  await page.getByLabel('Shockwave 1 Amount', { exact: true }).fill('70');
+  await page.getByLabel('Shockwave 1 Amount', { exact: true }).press('Tab');
+  await expect(looks.getByRole('button', { name: /^Aftershock/ })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  await looks.getByRole('button', { name: /^Mirror Lake/ }).click();
+  await page.getByLabel('Playhead', { exact: true }).fill('1.5');
+  const currentDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export current frame', exact: true }).click();
+  const expected = await pixelHash(page, await readFile((await (await currentDownload).path())!));
+  await expect.poll(() => pixelHash(page)).toBe(expected);
+  const bytes = await save();
+  const project = JSON.parse(bytes.toString());
+  expect(project.settings).toEqual(original.settings);
+  const { effects, effect, amount, cycles, ...timing } = project.motion.timeline;
+  const {
+    effects: oldEffects,
+    effect: oldEffect,
+    amount: oldAmount,
+    cycles: oldCycles,
+    ...oldTiming
+  } = original.motion.timeline;
+  expect(timing).toEqual(oldTiming);
+  expect(effects.map((e: { type: string }) => e.type)).toEqual(['flow', 'reflection']);
+  await page
+    .locator('#project-input')
+    .setInputFiles({ name: 'look.d4a', mimeType: 'application/json', buffer: bytes });
+  await expect(looks.getByRole('button', { name: /^Mirror Lake/ })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByLabel('Playhead', { exact: true }).fill('1.5');
+  await expect.poll(() => pixelHash(page)).toBe(expected);
+  await page.getByLabel('Mode', { exact: true }).selectOption('rgb');
+  await expect(looks.getByRole('button', { name: /^Chromatic Tide/ })).toBeDisabled();
+  await page.getByLabel('Mode', { exact: true }).selectOption('palette');
+  await expect(looks.getByRole('button', { name: /^Chromatic Tide/ })).toBeEnabled();
+  const liquid = looks.getByRole('button', { name: /^Liquid Ink/ });
+  await liquid.focus();
+  await liquid.press('Enter');
+  await expect(liquid).toHaveAttribute('aria-pressed', 'true');
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await looks.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/motion-looks-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 320, height: 844 });
+  await looks.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/motion-looks-mobile.png', fullPage: true });
+  expect(await looks.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+});

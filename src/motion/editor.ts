@@ -21,6 +21,7 @@ import {
   newMotionEffect,
   type MotionEffectType,
 } from './catalog';
+import { applyMotionPreset, matchesMotionPreset, motionPresets } from './presets';
 import type { CanvasSink } from 'mediabunny';
 
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -83,6 +84,9 @@ export class MotionEditor {
         <div class="field-row" id="duration-row"><label for="motion-duration">Duration (s)</label><input id="motion-duration" type="number" min="0.1" max="30" step="0.1" value="4"></div>
         <div class="motion-trim"><label>In (s)<input id="motion-in" type="number" min="0" step="0.01" value="0"></label><label>Out (s)<input id="motion-out" type="number" min="0.01" step="0.01" value="4"></label><label>FPS<select id="motion-fps" aria-label="FPS"><option>6</option><option selected>12</option><option>24</option><option>30</option></select></label></div>
         <p class="hint">Export a selection up to 30 seconds. Preview adapts to your device.</p>
+        <div class="section-title motion-subheading"><h3>Animation looks</h3></div>
+        <p class="hint" id="motion-looks-help">One click replaces source motion and the stack. Your image settings, trim and keyframes stay as they are.</p>
+        <div class="motion-looks" role="group" aria-label="Animation looks" aria-describedby="motion-looks-help">${motionPresets.map((p) => `<button type="button" class="motion-look" data-motion-preset="${p.id}" aria-pressed="false"><strong>${p.name}</strong><span>${p.description}</span></button>`).join('')}</div>
         <div class="field-row"><label for="motion-effect">Source motion</label><select id="motion-effect"><option value="none">None · source movement</option><option value="boil">Noise boil</option><option value="pulse">Brightness pulse</option><option value="zoom">Looping zoom</option><option value="pan">Horizontal drift</option></select></div>
         <div class="field-row"><label for="motion-amount">Amount</label><input id="motion-amount" type="range" min="0" max="100" value="35"></div>
         <div class="field-row"><label for="motion-cycles">Cycles</label><input id="motion-cycles" type="number" min="1" max="8" value="1"></div>
@@ -173,6 +177,26 @@ export class MotionEditor {
       this.t = validateTimeline(next, this.duration);
       this.keys();
       this.refresh();
+    });
+    document.querySelectorAll<HTMLButtonElement>('[data-motion-preset]').forEach((button) => {
+      button.onclick = () => {
+        try {
+          this.assertIdle();
+          const preset = motionPresets.find((p) => p.id === button.dataset.motionPreset)!;
+          if (preset.requiresPalette && this.host.settings().colorMode !== 'palette')
+            throw new Error('This animation look requires Palette color mode.');
+          const playing = this.playing;
+          this.pause();
+          this.t = validateTimeline(applyMotionPreset(this.t, preset.id), this.duration);
+          this.sync();
+          this.refresh();
+          el('motion-stack-status').textContent =
+            `${preset.name} applied. Source motion and stack replaced.`;
+          if (playing) this.play();
+        } catch (error) {
+          this.host.error(error);
+        }
+      };
     });
     bind('motion-add', () => {
       this.assertIdle();
@@ -329,7 +353,16 @@ export class MotionEditor {
     this.keys();
     this.keyValue();
   }
+  private syncPresets() {
+    document.querySelectorAll<HTMLButtonElement>('[data-motion-preset]').forEach((button) => {
+      const preset = motionPresets.find((p) => p.id === button.dataset.motionPreset)!;
+      button.setAttribute('aria-pressed', String(matchesMotionPreset(this.t, preset.id)));
+      button.disabled =
+        this.busy || (!!preset.requiresPalette && this.host.settings().colorMode !== 'palette');
+    });
+  }
   private stack() {
+    this.syncPresets();
     const container = el('motion-stack');
     container.replaceChildren();
     el('motion-stack-count').textContent = `${this.t.effects.length} / ${MAX_MOTION_EFFECTS}`;
@@ -561,6 +594,7 @@ export class MotionEditor {
     el('render-status').textContent = 'Preview cancelled. Change a setting to render again.';
   }
   refresh() {
+    this.syncPresets();
     const signature = JSON.stringify(this.host.settings()) + JSON.stringify(this.t);
     if (this.rendering && signature !== this.previewSignature) {
       this.processor?.dispose();
