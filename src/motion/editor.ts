@@ -1327,6 +1327,22 @@ export class MotionEditor {
       processor.dispose();
     }
   }
+  async audioExportProblem(format: string) {
+    const video = this.video;
+    if (!video?.hasAudio || !el<HTMLInputElement>('motion-audio').checked) return '';
+    const track = await video.input.getPrimaryAudioTrack();
+    if (!track) return '';
+    const m = await import('mediabunny');
+    const supported =
+      (await track.canDecode()) &&
+      (await m.canEncodeAudio(format === 'mp4' ? 'aac' : 'opus', {
+        numberOfChannels: await track.getNumberOfChannels(),
+        sampleRate: await track.getSampleRate(),
+      }));
+    return supported
+      ? ''
+      : 'Audio encoding is unavailable. Turn off Include audio, or choose a different video format.';
+  }
   exportInfo() {
     const format = el<HTMLSelectElement>('motion-format').value;
     const base = this.host.source();
@@ -1342,6 +1358,8 @@ export class MotionEditor {
       fps: this.t.fps,
       frames: frameCount(this.t),
       pendingVideo: !!this.pendingVideo,
+      audio: !!this.video?.hasAudio && el<HTMLInputElement>('motion-audio').checked,
+      sourceVersion: this.openVersion,
       minimumScale: Math.min(
         this.host.settings().scale,
         ...this.t.keys.filter((k) => k.channel === 'scale').map((k) => k.value),

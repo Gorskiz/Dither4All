@@ -194,6 +194,7 @@ let proofAbort: AbortController | null = null;
 let codecRevision = 0;
 let codecSignature = '';
 let codecProblem = '';
+let codecPending = false;
 function exportRatio() {
   return $<HTMLSelectElement>('export-size').value === 'custom'
     ? Number($<HTMLInputElement>('export-width').value) / source.width
@@ -781,6 +782,7 @@ function updateExportNote() {
         if (signature !== codecSignature) {
           codecSignature = signature;
           codecProblem = '';
+          codecPending = true;
           const revision = ++codecRevision;
           $('codec-status').textContent = 'Checking browser video support…';
           void import('mediabunny')
@@ -790,9 +792,11 @@ function updateExportNote() {
                 height: info.height,
                 frameRate: info.fps,
               });
+              const audioProblem = supported ? await motion.audioExportProblem(info.format) : '';
               if (revision !== codecRevision) return;
+              codecPending = false;
               codecProblem = supported
-                ? ''
+                ? audioProblem
                 : `${info.format.toUpperCase()} is unavailable here. Choose WebM, GIF or PNG frames.`;
               $('codec-status').textContent =
                 codecProblem || 'Video encoder available in this browser.';
@@ -800,6 +804,7 @@ function updateExportNote() {
             })
             .catch(() => {
               if (revision !== codecRevision) return;
+              codecPending = false;
               codecProblem = 'Could not check video support. Try GIF or PNG frames.';
               $('codec-status').textContent = codecProblem;
               updateExportNote();
@@ -822,11 +827,12 @@ function updateExportNote() {
     ++codecRevision;
     codecSignature = '';
     codecProblem = '';
+    codecPending = false;
     $('codec-status').textContent = '';
   }
   $('export-validation').textContent = problem || codecProblem;
   $<HTMLButtonElement>('download-export').disabled =
-    !!problem || !!codecProblem || exportBusy || motion.busy;
+    !!problem || !!codecProblem || codecPending || exportBusy || motion.busy;
   if (!exportBusy && !motion.busy)
     $('download-export').textContent = motion.active ? 'Download animation' : 'Download image';
 }

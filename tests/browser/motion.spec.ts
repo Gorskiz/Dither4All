@@ -151,3 +151,42 @@ test('video import, trim, keyframe project relink, and audio-preserving MP4/WebM
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test('export preflight blocks unsupported audio and permits a silent video export', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await openAdvanced(page);
+  const bytes = await movieFixture(page);
+  await page.evaluate(() => {
+    const original = AudioEncoder.isConfigSupported.bind(AudioEncoder);
+    AudioEncoder.isConfigSupported = (config) =>
+      config.codec === 'opus' ? Promise.resolve({ supported: false, config }) : original(config);
+  });
+  await page.locator('#image-input').setInputFiles({
+    name: 'audio-preflight.webm',
+    mimeType: 'video/webm',
+    buffer: Buffer.from(bytes),
+  });
+  await expect(page.locator('#motion-kind')).toHaveText('160 × 120');
+  await page.getByLabel('Motion format', { exact: true }).selectOption('webm');
+  const downloadButton = page.getByRole('button', { name: 'Download animation', exact: true });
+  await expect(page.locator('#codec-status')).toContainText('Audio encoding is unavailable');
+  await expect(downloadButton).toBeDisabled();
+  await page.getByLabel('Include audio in video export', { exact: true }).uncheck();
+  await expect(page.locator('#codec-status')).toContainText('Video encoder available');
+  await expect(downloadButton).toBeEnabled();
+  const download = page.waitForEvent('download');
+  await downloadButton.click();
+  const result = await metadata(page, await readFile((await (await download).path())!));
+  expect(result.audio).toBeNull();
+  expect(result.width).toBe(160);
+  await page.getByLabel('Include audio in video export', { exact: true }).check();
+  await expect(page.locator('#codec-status')).toContainText('Audio encoding is unavailable');
+  await expect(downloadButton).toBeDisabled();
+  await page.getByLabel('Motion format', { exact: true }).selectOption('frames');
+  await expect(downloadButton).toBeEnabled();
+  await page.getByLabel('Motion format', { exact: true }).selectOption('webm');
+  await expect(downloadButton).toBeDisabled();
+  await expect(page.locator('#codec-status')).toContainText('Audio encoding is unavailable');
+});
